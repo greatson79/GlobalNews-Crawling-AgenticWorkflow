@@ -839,6 +839,46 @@ context_injection:
   rule: "Each Pre-processing script extracts ONLY the sections relevant to that agent's task. Never pass full PRD to a sub-agent."
 ```
 
+### Parallel Translation Protocol
+
+When a step has `Translation: @translator`, the Orchestrator applies the following protocol based on document size:
+
+```yaml
+translation_protocol:
+  threshold: 350  # lines — documents above this trigger multi-agent translation
+
+  small_document:  # ≤ 350 lines
+    strategy: "single"
+    process: "Spawn one @translator Task agent → write .ko.md"
+
+  large_document:  # > 350 lines
+    strategy: "multi"
+    process:
+      step_1_split: "python3 scripts/split_for_translation.py --source <file> --output-dir .tmp/translate-chunks --project-dir ."
+      step_2_translate: "Spawn N @translator Task agents in PARALLEL — one per chunk"
+      step_3_merge: "python3 scripts/merge_translations.py --manifest .tmp/translate-chunks/manifest.json --output <file>.ko.md --project-dir ."
+      step_4_validate: "python3 .claude/hooks/scripts/validate_translation.py --step N --project-dir . --check-pacs --check-sequence"
+
+    chunk_rules:
+      - "Split on ## heading boundaries only — never within code blocks"
+      - "Code blocks (```yaml, ```json, ```python) are NOT translated — pass through unchanged"
+      - "Each chunk translator receives: chunk file + glossary + document title for context"
+      - "Each chunk translator writes chunk-NN.ko.md in the same output-dir"
+      - "Source language is auto-detected (character-class density heuristic)"
+
+    naming_convention:
+      source_chunk: ".tmp/translate-chunks/chunk-{NN}.md"
+      translated_chunk: ".tmp/translate-chunks/chunk-{NN}.ko.md"
+      manifest: ".tmp/translate-chunks/manifest.json"
+
+    pacs:
+      - "Each chunk translator does NOT score pACS independently"
+      - "Team Lead scores Translation pACS (Ft/Ct/Nt) on the MERGED output"
+      - "Single pacs-logs/step-N-translation-pacs.md for the merged result"
+```
+
+**Why multi-agent**: A single translator agent hits the 32K output token limit on documents > ~350 lines (~76KB). Splitting into N chunks keeps each agent well within limits while enabling parallel execution for speed.
+
 ### Hooks
 
 ```json
@@ -1096,7 +1136,7 @@ pacs_logging:
 | `@fact-checker` | Fact verification sub-agent |
 | `/command-name` | Slash command execution |
 | `Review: @reviewer \| @fact-checker \| none` | Per-step adversarial review assignment |
-| `Translation: @translator \| none` | Per-step translation assignment (text outputs only) |
+| `Translation: @translator \| none` | Per-step translation assignment (text outputs only). Documents > 350 lines use Parallel Translation Protocol (split → N agents → merge) |
 | `Pre-processing` | Python script executed before agent task (data filtering/merging) |
 | `Post-processing` | Python script executed after agent task (validation/transformation) |
 | `Checkpoints (dense)` | Dense Checkpoint Pattern — CP-1/CP-2/CP-3 intermediate reports |

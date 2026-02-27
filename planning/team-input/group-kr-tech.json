@@ -1,0 +1,66 @@
+{
+  "generated": "2026-02-26T05:01:58Z",
+  "strategy_group": "kr-tech",
+  "description": "Korean IT/Science specialty sites",
+  "assigned_agent": "@crawl-strategist-kr",
+  "focus_areas": "Simpler structures, tech-focused content, mixed Korean/English",
+  "site_count": 7,
+  "sites": [
+    {
+      "domain": "38north.org",
+      "language": "en",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "English-language analysis site",
+      "recon_row": "| 13 | 38north.org | Y — /feed (RSS 2.0, 10 items) | Y — /sitemap_index.xml | Static/SSR (WordPress) | none | LOW | en | ~16 | ~5 | Easy |"
+    },
+    {
+      "domain": "bloter.net",
+      "language": "ko",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "",
+      "recon_row": "| bloter.net | Playwright (modern SPA) |"
+    },
+    {
+      "domain": "etnews.com",
+      "language": "ko",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "",
+      "recon_row": "| 15 | etnews.com | Y — /rss or /rss.xml | Y — /sitemap.xml | SSR | none | MEDIUM | ko | ~10 | ~100 | Medium |"
+    },
+    {
+      "domain": "sciencetimes.co.kr",
+      "language": "ko",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "",
+      "recon_row": "| 16 | sciencetimes.co.kr | Likely Y — /rss | Y — /sitemap.xml | SSR | none | HIGH | ko | ~8 | ~20 | Hard |"
+    },
+    {
+      "domain": "zdnet.co.kr",
+      "language": "ko",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "",
+      "recon_row": "| 17 | zdnet.co.kr | Y — /rss or /rss.xml | Y — /sitemap.xml | SSR/Hybrid | none | MEDIUM | ko | ~8 | ~80 | Medium |"
+    },
+    {
+      "domain": "irobotnews.com",
+      "language": "ko",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "",
+      "recon_row": "| 18 | irobotnews.com | Likely Y — /feed | Y — /sitemap.xml | SSR (WordPress) | none | HIGH | ko | ~5 | ~10 | Hard |"
+    },
+    {
+      "domain": "techneedle.com",
+      "language": "ko",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "",
+      "recon_row": "| 19 | techneedle.com | Likely Y — /feed | Y — /sitemap.xml | SSR (WordPress) | none | HIGH | ko | ~5 | ~5 | Hard |"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 workflow:
   name: GlobalNews Crawling & Analysis Auto-Build
-  current_step: 1
-  status: in_progress
+  current_step: 20
+  status: complete
   total_steps: 20
   parent_genome:
     source: AgenticWorkflow
@@ -17,9 +17,38 @@ workflow:
     - context-preservation
     - cross-step-traceability
   autopilot:
-    enabled: false
-    auto_approved_steps: []
-  outputs: {}
+    enabled: true
+    auto_approved_steps:
+    - 8
+    - 18
+  outputs:
+    step-1: research/site-reconnaissance.md
+    step-1-ko: research/site-reconnaissance.ko.md
+    step-2: research/tech-validation.md
+    step-3: research/crawling-feasibility.md
+    step-3-ko: research/crawling-feasibility.ko.md
+    step-4: research/step-4-research-review.md
+    step-5: planning/architecture-blueprint.md
+    step-5-ko: planning/architecture-blueprint.ko.md
+    step-6: planning/crawling-strategies.md
+    step-7: planning/analysis-pipeline-design.md
+    step-7-ko: planning/analysis-pipeline-design.ko.md
+    step-8: autopilot-logs/step-8-decision.md
+    step-9: src/
+    step-10: src/crawling/
+    step-11: src/crawling/adapters/
+    step-12: src/crawling/
+    step-13: src/analysis/
+    step-14: src/analysis/
+    step-15: src/analysis/pipeline.py
+    step-16: testing/e2e-test-report.md
+    step-16-ko: testing/e2e-test-report.ko.md
+    step-17: scripts/run_daily.sh
+    step-18: autopilot-logs/step-18-decision.md
+    step-19: docs/README-SYSTEM.md
+    step-19-ko: docs/README-SYSTEM.ko.md
+    step-20: review-logs/step-20-review.md
+    step-20-ko: review-logs/step-20-review.ko.md
   pending_human_action:
     step: null
     options: []
@@ -27,11 +56,153 @@ workflow:
     last_verified_step: 0
     retries: {}
   pacs:
-    current_step_score: null
+    current_step_score: 78.0
     dimensions:
-      F: null
-      C: null
-      L: null
-    weak_dimension: null
+      F: 78.0
+      C: 80.0
+      L: 80.0
+    weak_dimension: F
     pre_mortem_flag: null
-    history: {}
+    history:
+      step-1:
+        score: 70.0
+        weak: F
+      step-2:
+        score: 74.0
+        weak: F
+      step-3:
+        score: 72.0
+        weak: F
+      step-5:
+        score: 78.0
+        weak: F
+      step-6:
+        score: 72.0
+        weak: F
+      step-7:
+        score: 80.0
+        weak: F
+      step-9:
+        score: 82.0
+        weak: F
+      step-10:
+        score: 82.0
+        weak: F
+      step-11:
+        score: 78.0
+        weak: F
+      step-12:
+        score: 82.0
+        weak: F
+      step-13:
+        score: 80.0
+        weak: F
+      step-14:
+        score: 82.0
+        weak: F
+      step-15:
+        score: 82.0
+        weak: F
+      step-16:
+        score: 65.0
+        weak: F
+      step-17:
+        score: 84.0
+        weak: F
+      step-18:
+        score: 80.0
+        weak: F
+      step-19:
+        score: 82.0
+        weak: F
+      step-20:
+        score: 78.0
+        weak: F
+  active_team:
+    name: null
+    status: null
+    tasks_completed: []
+    tasks_pending: []
+    completed_summaries: {}
+  completed_teams:
+  - name: tech-validation-team
+    status: all_completed
+    tasks_completed:
+    - dep-validator
+    - nlp-benchmarker
+    - memory-profiler
+    tasks_pending: []
+    completed_summaries:
+      dep-validator: '44 packages: 34 GO, 3 NO-GO, 5 CONDITIONAL. Python 3.12 recommended.'
+      memory-profiler: Peak 1.25GB RSS (12.2% of 10GB). Kiwi singleton mandatory.
+        PASS.
+      nlp-benchmarker: 6 models benchmarked. 500 articles in 4.8min. All GO/CONDITIONAL.
+  - name: crawl-strategy-team
+    status: all_completed
+    tasks_completed:
+    - crawl-strategist-kr
+    - crawl-strategist-en
+    - crawl-strategist-asia
+    - crawl-strategist-global
+    tasks_pending: []
+    completed_summaries:
+      crawl-strategist-kr: 11 Korean sites (Group A+B). RSS-first for 8/11 sites.
+      crawl-strategist-en: 16 English sites (Group C+D). RSS available for 14/16.
+      crawl-strategist-asia: 10 Asia-Pacific sites (Group E+F). CJK encoding handling.
+      crawl-strategist-global: 7 Europe/Middle East sites (Group G). RTL support for
+        Arabic.
+  - name: crawl-engine-team
+    status: all_completed
+    tasks_completed:
+    - crawler-core-dev
+    - anti-block-dev
+    - dedup-dev
+    - ua-rotation-dev
+    tasks_pending: []
+    completed_summaries:
+      crawler-core-dev: 4 files, 3146 lines. 3-Tier URL Discovery, extraction chain.
+        pACS=78.
+      anti-block-dev: 4 files, 2014 lines. 7-type block detection, 6-tier escalation.
+        pACS=80.
+      dedup-dev: 2 files, 1257 lines. SimHash+Jaccard+Levenshtein. pACS=82.
+      ua-rotation-dev: 2 files, 1763 lines. 61+ UAs, 4-tier system. pACS=78.
+  - name: site-adapters-team
+    status: all_completed
+    tasks_completed:
+    - adapter-dev-kr-major
+    - adapter-dev-kr-tech
+    - adapter-dev-english
+    - adapter-dev-multilingual
+    tasks_pending: []
+    completed_summaries:
+      adapter-dev-kr-major: 11 adapters, 2591 lines, 229 tests. pACS=82.
+      adapter-dev-kr-tech: 8 adapters, 2090 lines. pACS=78.
+      adapter-dev-english: 12 adapters, 2821 lines. pACS=78.
+      adapter-dev-multilingual: 13 adapters, 2870 lines, 294 tests. pACS=80.
+  - name: analysis-foundation-team
+    status: all_completed
+    tasks_completed:
+    - preprocessing-dev
+    - feature-extraction-dev
+    - article-analysis-dev
+    - aggregation-dev
+    tasks_pending: []
+    completed_summaries:
+      preprocessing-dev: 'Stage 1: 1419 lines, T01-T06, 79 tests. pACS TBD.'
+      feature-extraction-dev: 'Stage 2: 1507 lines, T07-T12, 65 tests. pACS=82.'
+      article-analysis-dev: 'Stage 3: 1726 lines, T13-T19+T49. pACS TBD.'
+      aggregation-dev: 'Stage 4: 2149 lines, T21-T28, 4 outputs. pACS TBD.'
+  - name: analysis-signal-team
+    status: all_completed
+    tasks_completed:
+    - timeseries-dev
+    - cross-analysis-dev
+    - signal-classifier-dev
+    - storage-dev
+    tasks_pending: []
+    completed_summaries:
+      timeseries-dev: 'Stage 5: 2140 lines, T29-T36, 59 tests pass. pACS=82.'
+      cross-analysis-dev: 'Stage 6: 2617 lines, T37-T46+T20+T50, 60 tests pass. pACS=82.'
+      signal-classifier-dev: 'Stage 7: 2180 lines, T47-T48+T51-T55+BERTrend+Singularity,
+        111 tests pass. pACS=82.'
+      storage-dev: 'Stage 8: 2198 lines (3 files), 74 tests pass. pACS=82.'

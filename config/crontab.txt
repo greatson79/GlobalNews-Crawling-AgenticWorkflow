@@ -1,0 +1,40 @@
+# =============================================================================
+# GlobalNews Crawling & Analysis System -- Cron Schedule
+# =============================================================================
+#
+# Install:
+#   crontab config/crontab.txt
+#
+# Or append to existing crontab:
+#   (crontab -l 2>/dev/null; cat config/crontab.txt) | crontab -
+#
+# Before installing, update PROJECT_DIR to match your deployment path.
+#
+# Verify after installation:
+#   crontab -l
+#
+# =============================================================================
+
+# ---- Configuration ----
+# Update this to your actual project directory
+PROJECT_DIR=/path/to/GlobalNews-Crawling-AgenticWorkflow
+
+# Use project's virtualenv Python
+PATH=/usr/local/bin:/usr/bin:/bin
+
+# ---- Daily Pipeline: Full crawl + 8-stage analysis ----
+# Runs at 02:00 AM every day
+# Timeout: 4 hours (built into script)
+# Lock: prevents concurrent execution
+0 2 * * * cd $PROJECT_DIR && ./scripts/run_daily.sh >> $PROJECT_DIR/data/logs/cron/daily.log 2>&1
+
+# ---- Weekly Site Structure Rescan ----
+# Runs at 01:00 AM every Sunday (day 0)
+# Validates adapter health, RSS feeds, DOM selectors
+# Will defer if daily pipeline is still running
+0 1 * * 0 cd $PROJECT_DIR && ./scripts/run_weekly_rescan.sh >> $PROJECT_DIR/data/logs/cron/weekly.log 2>&1
+
+# ---- Monthly Data Archival ----
+# Runs at 03:00 AM on the 1st of each month
+# Compresses data older than 30 days with integrity verification
+0 3 1 * * cd $PROJECT_DIR && ./scripts/archive_old_data.sh >> $PROJECT_DIR/data/logs/cron/archive.log 2>&1

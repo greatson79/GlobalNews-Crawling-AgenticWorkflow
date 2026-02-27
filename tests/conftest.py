@@ -114,3 +114,89 @@ def _create_dummy_output(project_dir, path, size=200):
 def create_output():
     """Factory fixture to create dummy output files in a project directory."""
     return _create_dummy_output
+
+
+# ---------------------------------------------------------------------------
+# GlobalNews System Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def sample_sources_yaml(tmp_path):
+    """Create a minimal valid sources.yaml for testing.
+
+    Returns:
+        Path to the temporary sources.yaml file.
+    """
+    content = """
+sources:
+  test_site:
+    name: "Test Site"
+    url: "https://www.example.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.example.com/rss"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 100
+      sections_count: 5
+      enabled: true
+"""
+    yaml_path = tmp_path / "sources.yaml"
+    yaml_path.write_text(content)
+    return yaml_path
+
+
+@pytest.fixture
+def sample_pipeline_yaml(tmp_path):
+    """Create a minimal valid pipeline.yaml for testing.
+
+    Returns:
+        Path to the temporary pipeline.yaml file.
+    """
+    content = """
+pipeline:
+  version: "1.0"
+  python_version: "3.12"
+  global:
+    max_memory_gb: 10
+    log_level: "INFO"
+    gc_between_stages: true
+    parquet_compression: "zstd"
+    batch_size_default: 500
+  stages:
+    stage_1_preprocessing:
+      enabled: true
+      description: "Test stage"
+      input_format: "jsonl"
+      output_format: "parquet"
+      output_path: "data/processed/articles.parquet"
+      parallelism: 1
+      memory_limit_gb: 1.5
+      timeout_seconds: 1800
+      models: []
+      dependencies: []
+"""
+    yaml_path = tmp_path / "pipeline.yaml"
+    yaml_path.write_text(content)
+    return yaml_path

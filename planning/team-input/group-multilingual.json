@@ -1,0 +1,114 @@
+{
+  "generated": "2026-02-26T05:01:58Z",
+  "strategy_group": "multilingual",
+  "description": "Asia-Pacific + Europe/Middle East multilingual sites",
+  "assigned_agent": "@crawl-strategist-asia + @crawl-strategist-global",
+  "focus_areas": "Character encoding, RTL text, geo-blocking, multi-language sections",
+  "site_count": 13,
+  "sites": [
+    {
+      "domain": "people.com.cn",
+      "language": "zh",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Chinese encoding (GB2312/UTF-8)",
+      "recon_row": "| people.com.cn | 120-second crawl-delay compliance |"
+    },
+    {
+      "domain": "globaltimes.cn",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Chinese state media, English edition",
+      "recon_row": "| 33 | globaltimes.cn | N (not detected in initial HTML) | Y — /sitemap.xml (news NS, 60 URLs) | SSR (jQuery) | none | LOW | en | ~4 | ~40 | Easy |"
+    },
+    {
+      "domain": "scmp.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "South China Morning Post",
+      "recon_row": "| scmp.com, arabnews.com | 10-second crawl-delay compliance |"
+    },
+    {
+      "domain": "taiwannews.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "",
+      "recon_row": "| 35 | taiwannews.com.tw | N (not detected) | Y — 3 sitemaps (en/zh/default) | SSR/Next.js | none | LOW | en/zh | ~10 | ~30 | Easy |"
+    },
+    {
+      "domain": "yomiuri.co.jp",
+      "language": "ja",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Japanese encoding (Shift_JIS/UTF-8)",
+      "recon_row": "| yomiuri.co.jp | Japanese proxy + Japanese NLP |"
+    },
+    {
+      "domain": "thehindu.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "",
+      "recon_row": "| 37 | thehindu.com | Y — /rss | Y — /sitemap.xml | SSR | soft-metered | HIGH | en | ~15 | ~100 | Medium |"
+    },
+    {
+      "domain": "thesun.co.uk",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "UK tabloid",
+      "recon_row": "| thesun.co.uk | UK IP preference |"
+    },
+    {
+      "domain": "bild.de",
+      "language": "de",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "German-language",
+      "recon_row": "| bild.de | German IP preference |"
+    },
+    {
+      "domain": "lemonde.fr",
+      "language": "fr",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "French, /en/ section for English",
+      "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
+    },
+    {
+      "domain": "themoscowtimes.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "",
+      "recon_row": "| 41 | themoscowtimes.com | Y — /page/rss (4 feeds) | Y — static.themoscowtimes.com/sitemap/sitemap.xml | SSR | freemium | LOW | en | ~9 | ~20 | Easy |"
+    },
+    {
+      "domain": "arabnews.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Arabic+English, potential RTL",
+      "recon_row": "| scmp.com, arabnews.com | 10-second crawl-delay compliance |"
+    },
+    {
+      "domain": "aljazeera.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Arabic+English",
+      "recon_row": "| aljazeera.com, cnn.com, huffpost.com, buzzfeed.com | Non-AI user agent required |"
+    },
+    {
+      "domain": "israelhayom.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Hebrew+English, potential RTL",
+      "recon_row": "| 44 | israelhayom.com | Y — /feed (WordPress) | Y — /sitemap.xml | SSR (WordPress) | none | LOW | en | ~5 | ~30 | Easy |"
+    }
+  ]
+}

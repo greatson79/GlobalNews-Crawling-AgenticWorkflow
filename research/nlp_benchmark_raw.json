@@ -1,0 +1,105 @@
+{
+  "kiwi": {
+    "status": "SUCCESS",
+    "version": "0.22.2",
+    "load_time_s": 0.398,
+    "rss_after_load_mb": 587.7,
+    "load_mem_delta_mb": 558.3,
+    "rss_steady_state_mb": 758.6,
+    "sentences_per_sec": 4409.7,
+    "article_throughput": {
+      "short_100": {
+        "count": 20,
+        "mean_s": 0.008158475003438071,
+        "std_s": 0.00010347687429843989,
+        "articles_per_sec": 2451.4385337421245
+      },
+      "medium_500": {
+        "count": 50,
+        "mean_s": 0.11396100019919686,
+        "std_s": 0.0018199470591626465,
+        "articles_per_sec": 438.7465879783703
+      },
+      "long_2000": {
+        "count": 20,
+        "mean_s": 0.20552440839237535,
+        "std_s": 0.007280382976725473,
+        "articles_per_sec": 97.31204267386651
+      }
+    },
+    "batch_speedup": 9.03,
+    "total_tokens_25_sents": 520,
+    "avg_tokens_per_sent": 20.8
+  },
+  "sbert": {
+    "status": "SUCCESS",
+    "model": "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2",
+    "device": "mps",
+    "mps_active": true,
+    "load_time_s": 2.583,
+    "rss_after_load_mb": 1801.9,
+    "load_mem_delta_mb": 607.7,
+    "rss_steady_state_mb": 1986.0,
+    "mean_similar_cosine": 0.2765,
+    "mean_dissimilar_cosine": 0.1178,
+    "separation_ratio": 2.348,
+    "batch_results": {
+      "16": {
+        "mean_s": 0.092,
+        "std_s": 0.0029,
+        "sentences_per_sec": 2781.3
+      },
+      "32": {
+        "mean_s": 0.0638,
+        "std_s": 0.0031,
+        "sentences_per_sec": 4014.9
+      },
+      "64": {
+        "mean_s": 0.0543,
+        "std_s": 0.0011,
+        "sentences_per_sec": 4716.3
+      },
+      "128": {
+        "mean_s": 0.0503,
+        "std_s": 0.0011,
+        "sentences_per_sec": 5089.5
+      }
+    },
+    "optimal_batch_size": 128,
+    "optimal_sps": 5089.5,
+    "single_sentence_latency_ms": 6.1
+  },
+  "keybert": {
+    "status": "SUCCESS",
+    "load_time_s": 0.0,
+    "rss_after_load_mb": 2005.5,
+    "rss_steady_state_mb": 2061.8,
+    "docs_per_sec_20_articles": 19.847,
+    "mean_time_20_articles_s": 1.0077,
+    "std_time_s": 0.0224
+  },
+  "bertopic": {
+    "status": "SUCCESS",
+    "init_time_s": 0.0,
+    "fit_time_s_100_docs": 4.248,
+    "rss_after_fit_mb": 2422.8,
+    "fit_mem_delta_mb": 122.5,
+    "unique_topics_found": 3,
+    "corpus_size": 100,
+    "note": "BERTopic imports and fits successfully despite dep-validator CONDITIONAL flag. pydantic issue in dep-validator was env-specific."
+  },
+  "transformers": {
+    "status": "SUCCESS",
+    "model": "xlm-roberta-base",
+    "device": "mps",
+    "tokenizer_load_time_s": 2.835,
+    "model_load_time_s": 507.204,
+    "total_load_time_s": 510.039,
+    "rss_after_load_mb": 3330.5,
+    "load_mem_delta_mb": 907.6,
+    "rss_steady_state_mb": 3368.4,
+    "inference_sentences_per_sec": 157.36,
+    "mean_inference_time_10sents_s": 0.0635,
+    "std_inference_time_s": 0.006
+  }
+}

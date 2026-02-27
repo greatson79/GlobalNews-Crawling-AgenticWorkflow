@@ -1,0 +1,214 @@
+{
+  "group": "english",
+  "total_sites": 52,
+  "sites": [
+    {
+      "name": "#",
+      "strategy": "Site"
+    },
+    {
+      "name": "Fallback",
+      "strategy": "Rate"
+    },
+    {
+      "name": "Bot Block",
+      "strategy": "Proxy"
+    },
+    {
+      "name": "Daily Est.",
+      "strategy": "Min"
+    },
+    {
+      "name": "20",
+      "domain": "marketwatch.com"
+    },
+    {
+      "name": "Sitemap+DOM",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "HIGH",
+      "strategy": "—"
+    },
+    {
+      "name": "~200",
+      "domain": "5.0"
+    },
+    {
+      "name": "21",
+      "domain": "voakorea.com"
+    },
+    {
+      "name": "Sitemap+DOM",
+      "strategy": "2s"
+    },
+    {
+      "name": "LOW",
+      "strategy": "—"
+    },
+    {
+      "name": "~50",
+      "domain": "1.5"
+    },
+    {
+      "name": "22",
+      "domain": "huffingtonpost.com (huffpost.com)"
+    },
+    {
+      "name": "DOM+PW",
+      "strategy": "5s"
+    },
+    {
+      "name": "HIGH",
+      "strategy": "—"
+    },
+    {
+      "name": "~100",
+      "domain": "3.0"
+    },
+    {
+      "name": "23",
+      "domain": "nytimes.com"
+    },
+    {
+      "name": "DOM(title)",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "EXTREME",
+      "strategy": "—"
+    },
+    {
+      "name": "~300",
+      "domain": "5.0"
+    },
+    {
+      "name": "24",
+      "domain": "ft.com"
+    },
+    {
+      "name": "DOM(title)",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "EXTREME",
+      "strategy": "—"
+    },
+    {
+      "name": "~150",
+      "domain": "4.0"
+    },
+    {
+      "name": "25",
+      "domain": "wsj.com"
+    },
+    {
+      "name": "DOM(title)",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "EXTREME",
+      "strategy": "—"
+    },
+    {
+      "name": "~200",
+      "domain": "4.0"
+    },
+    {
+      "name": "26",
+      "domain": "latimes.com"
+    },
+    {
+      "name": "Sitemap+DOM",
+      "strategy": "5s"
+    },
+    {
+      "name": "HIGH",
+      "strategy": "—"
+    },
+    {
+      "name": "~150",
+      "domain": "3.5"
+    },
+    {
+      "name": "27",
+      "domain": "buzzfeed.com"
+    },
+    {
+      "name": "Sitemap+DOM",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "HIGH",
+      "strategy": "—"
+    },
+    {
+      "name": "~50",
+      "domain": "6.0"
+    },
+    {
+      "name": "28",
+      "domain": "nationalpost.com"
+    },
+    {
+      "name": "Sitemap+DOM",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "HIGH",
+      "strategy": "—"
+    },
+    {
+      "name": "~100",
+      "domain": "3.0"
+    },
+    {
+      "name": "29",
+      "domain": "edition.cnn.com"
+    },
+    {
+      "name": "DOM+RSS",
+      "strategy": "5s"
+    },
+    {
+      "name": "HIGH",
+      "strategy": "—"
+    },
+    {
+      "name": "~500",
+      "domain": "6.0"
+    },
+    {
+      "name": "30",
+      "domain": "bloomberg.com"
+    },
+    {
+      "name": "DOM(title)",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "EXTREME",
+      "strategy": "—"
+    },
+    {
+      "name": "~200",
+      "domain": "4.0"
+    },
+    {
+      "name": "31",
+      "domain": "afmedios.com"
+    },
+    {
+      "name": "Sitemap(WP)",
+      "strategy": "2s"
+    },
+    {
+      "name": "LOW",
+      "strategy": "—"
+    },
+    {
+      "name": "~20",
+      "domain": "0.5"
+    }
+  ]
+}

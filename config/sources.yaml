@@ -1,0 +1,248 @@
+_meta:
+  version: 1.0.0-draft
+  generated_by: generate_sources_yaml_draft.py
+  description: News sources configuration — auto-generated draft from site reconnaissance
+  total_sites: 44
+sources:
+- domain: chosun.com
+  name: Chosun Ilbo
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: joongang.co.kr
+  name: JoongAng Ilbo
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: donga.com
+  name: Dong-A Ilbo
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: hani.co.kr
+  name: Hankyoreh
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: yna.co.kr
+  name: Yonhap News
+  language: ko
+  crawl_method: rss+api
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: mk.co.kr
+  name: Maeil Business
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: hankyung.com
+  name: Korea Economic Daily
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: fnnews.com
+  name: Financial News
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: mt.co.kr
+  name: Money Today
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: nocutnews.co.kr
+  name: NoCut News
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: kmib.co.kr
+  name: Kookmin Ilbo
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: zdnet.co.kr
+  name: ZDNet Korea
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: itworld.co.kr
+  name: IT World Korea
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 1
+- domain: bloter.net
+  name: Bloter
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: etnews.com
+  name: Electronic Times
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: ddaily.co.kr
+  name: Digital Daily
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 1
+- domain: aitimes.com
+  name: AI Times
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 1
+- domain: techm.kr
+  name: TechM
+  language: ko
+  crawl_method: html
+  anti_block_tier: 1
+- domain: byline.network
+  name: Byline Network
+  language: ko
+  crawl_method: rss+html
+  anti_block_tier: 1
+- domain: reuters.com
+  name: Reuters
+  language: en
+  crawl_method: rss+api
+  anti_block_tier: 3
+- domain: apnews.com
+  name: AP News
+  language: en
+  crawl_method: rss+api
+  anti_block_tier: 2
+- domain: wsj.com
+  name: Wall Street Journal
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: nytimes.com
+  name: New York Times
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: washingtonpost.com
+  name: Washington Post
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 3
+- domain: ft.com
+  name: Financial Times
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: economist.com
+  name: The Economist
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 3
+- domain: bbc.com
+  name: BBC News
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: theguardian.com
+  name: The Guardian
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: cnn.com
+  name: CNN
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: aljazeera.com
+  name: Al Jazeera English
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: bloomberg.com
+  name: Bloomberg
+  language: en
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: nhk.or.jp
+  name: NHK News Web
+  language: ja
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: asahi.com
+  name: Asahi Shimbun
+  language: ja
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: nikkei.com
+  name: Nikkei
+  language: ja
+  crawl_method: rss+html
+  anti_block_tier: 3
+- domain: xinhuanet.com
+  name: Xinhua News
+  language: zh
+  crawl_method: html
+  anti_block_tier: 2
+- domain: scmp.com
+  name: South China Morning Post
+  language: zh
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: caixin.com
+  name: Caixin
+  language: zh
+  crawl_method: html
+  anti_block_tier: 2
+- domain: aljazeera.net
+  name: Al Jazeera Arabic
+  language: ar
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: alarabiya.net
+  name: Al Arabiya
+  language: ar
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: lemonde.fr
+  name: Le Monde
+  language: fr
+  crawl_method: rss+html
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: spiegel.de
+  name: Der Spiegel
+  language: de
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: elpais.com
+  name: El Pais
+  language: es
+  crawl_method: rss+html
+  anti_block_tier: 2
+- domain: tass.com
+  name: TASS
+  language: ru
+  crawl_method: html
+  anti_block_tier: 2
+- domain: afp.com
+  name: Agence France-Presse
+  language: fr
+  crawl_method: rss+html
+  anti_block_tier: 2

@@ -3859,7 +3859,10 @@ def _read_sot_outputs(project_dir):
                 except ImportError:
                     continue
             if isinstance(data, dict):
-                outputs = data.get("outputs", {})
+                # Support both flat (outputs:) and nested (workflow.outputs:) SOT
+                outputs = data.get("outputs")
+                if outputs is None and isinstance(data.get("workflow"), dict):
+                    outputs = data["workflow"].get("outputs")
                 return outputs if isinstance(outputs, dict) else {}
         except Exception:
             continue

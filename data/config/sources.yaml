@@ -1,0 +1,1627 @@
+# GlobalNews Sources Configuration
+# All 44 news sites with complete crawling configurations
+#
+# Generated from Step 6: Per-Site Crawling Strategies
+# Source: planning/crawl-strategy-{korean,english,asia,global}.md
+# Schema: Step 5 Architecture Blueprint, Section 5c
+#
+# Sites: 44 (19 Korean + 12 English + 6 Asia-Pacific + 7 Europe/ME)
+# Daily article estimate: ~6,395
+# Primary methods: RSS(29), Sitemap(9), Playwright(2), API(2), DOM(2)
+#
+# ============================================================================
+# FIELD REFERENCE
+# ============================================================================
+#
+# name:                    Human-readable site name (for display and reports)
+# url:                     Canonical base URL including scheme (https://...)
+# region:                  Geographic region code (kr, us, uk, cn, jp, de, fr, me, in, tw, il, ru)
+# language:                ISO 639-1 language code (ko, en, zh, ja, de, fr, es, ar, he)
+# group:                   Site group A-G (determines adapter subdirectory):
+#                            A = Korean Major Dailies
+#                            B = Korean Economy
+#                            C = Korean Niche
+#                            D = Korean IT/Science
+#                            E = English-Language Western
+#                            F = Asia-Pacific
+#                            G = Europe/Middle East
+#
+# crawl.primary_method:    First URL discovery method to try (rss|sitemap|api|playwright|dom)
+# crawl.fallback_methods:  Ordered list of fallback methods if primary fails
+# crawl.rss_url:           Primary RSS feed URL (absolute or relative to site url)
+# crawl.sitemap_url:       Sitemap URL (absolute or relative; typically /sitemap.xml)
+# crawl.rate_limit_seconds: Minimum delay (seconds) between consecutive requests to this site
+# crawl.crawl_delay_mandatory: robots.txt Crawl-delay value if specified (null = not specified)
+# crawl.max_requests_per_hour: Upper bound on hourly request count (safety cap)
+# crawl.jitter_seconds:    Random jitter (0-N seconds) added to rate_limit_seconds
+#
+# anti_block.ua_tier:      User-Agent rotation tier (1=bot UA, 2=10 desktop, 3=50 diverse, 4=Patchright)
+# anti_block.default_escalation_tier: Starting tier when blocks are detected (1-6)
+# anti_block.max_escalation_tier: Highest tier the system will auto-escalate to (1-6)
+# anti_block.requires_proxy: Whether a regional proxy is needed (geo-blocked sites)
+# anti_block.proxy_region: Required proxy country code (kr, us, etc.) if requires_proxy=true
+# anti_block.bot_block_level: Expected blocking aggressiveness (LOW|MEDIUM|HIGH)
+#
+# extraction.paywall_type: Paywall handling (none|soft-metered|hard)
+#                          hard = title-only extraction (body empty)
+#                          soft-metered = limited free articles per day
+# extraction.title_only:   If true, only extract title (for hard-paywall sites)
+# extraction.rendering_required: Whether JavaScript rendering is needed for extraction
+# extraction.charset:      Expected character encoding (utf-8, euc-kr, shift_jis, etc.)
+#
+# meta.difficulty_tier:    Crawling difficulty assessment (Easy|Medium|Hard|Extreme)
+# meta.daily_article_estimate: Expected number of articles per day from this site
+# meta.sections_count:     Number of sections/categories on the site
+# meta.enabled:            Whether to include this site in crawl runs (true|false)
+#
+# ============================================================================
+
+sources:
+  chosun:
+    name: "Chosun Ilbo"
+    url: "https://www.chosun.com"
+    region: "kr"
+    language: "ko"
+    group: "A"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.chosun.com/arc/outboundfeeds/rss/?outputType=xml"
+      sitemap_url: "/sitemap.xml"
+      article_link_css: "a[href*='/article/']"
+      sections: ["/politics", "/economy", "/national", "/international", "/sports", "/culture-life", "/opinion"]
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 200
+      sections_count: 15
+      enabled: true
+
+  joongang:
+    name: "JoongAng Ilbo"
+    url: "https://www.joongang.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "A"
+    crawl:
+      primary_method: "dom"
+      fallback_methods: ["sitemap"]
+      rss_url: ""
+      sitemap_url: "/sitemap.xml"
+      article_link_css: "a[href*='/article/']"
+      sections: ["/politics", "/economy", "/society", "/international", "/sports", "/culture", "/opinion"]
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 180
+      sections_count: 12
+      enabled: true
+
+  donga:
+    name: "Dong-A Ilbo"
+    url: "https://www.donga.com"
+    region: "kr"
+    language: "ko"
+    group: "A"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "http://rss.donga.com/total.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 200
+      sections_count: 14
+      enabled: true
+
+  hani:
+    name: "Hankyoreh"
+    url: "https://www.hani.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "A"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.hani.co.kr/rss/hani.rss"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 120
+      sections_count: 10
+      enabled: true
+
+  yna:
+    name: "Yonhap News Agency"
+    url: "https://www.yna.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "A"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.yna.co.kr/rss/news.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 500
+      sections_count: 20
+      enabled: true
+
+  mk:
+    name: "Maeil Business Newspaper"
+    url: "https://www.mk.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "B"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "http://file.mk.co.kr/news/rss/rss_30000001.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 300
+      sections_count: 12
+      enabled: true
+
+  hankyung:
+    name: "Korea Economic Daily"
+    url: "https://www.hankyung.com"
+    region: "kr"
+    language: "ko"
+    group: "B"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "http://rss.hankyung.com/economy.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 250
+      sections_count: 10
+      enabled: true
+
+  fnnews:
+    name: "Financial News"
+    url: "https://www.fnnews.com"
+    region: "kr"
+    language: "ko"
+    group: "B"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "http://www.fnnews.com/rss/fn_realnews_all.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 150
+      sections_count: 8
+      enabled: true
+
+  mt:
+    name: "Money Today"
+    url: "https://www.mt.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "B"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.mt.co.kr/rss/"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 200
+      sections_count: 10
+      enabled: true
+
+  nocutnews:
+    name: "NoCut News"
+    url: "https://www.nocutnews.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "C"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "http://rss.nocutnews.co.kr/nocutnews.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 100
+      sections_count: 8
+      enabled: true
+
+  kmib:
+    name: "Kookmin Ilbo"
+    url: "https://www.kmib.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "C"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.kmib.co.kr/rss/data/kmibPolRss.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 120
+      sections_count: 10
+      enabled: true
+
+  ohmynews:
+    name: "OhmyNews"
+    url: "https://www.ohmynews.com"
+    region: "kr"
+    language: "ko"
+    group: "C"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.ohmynews.com/rss/rss.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 80
+      sections_count: 8
+      enabled: true
+
+  38north:
+    name: "38 North"
+    url: "https://www.38north.org"
+    region: "kr"
+    language: "en"
+    group: "D"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap"]
+      rss_url: "https://www.38north.org/feed"
+      sitemap_url: "/sitemap_index.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 3
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 5
+      sections_count: 16
+      enabled: true
+
+  bloter:
+    name: "Bloter"
+    url: "https://www.bloter.net"
+    region: "kr"
+    language: "ko"
+    group: "D"
+    crawl:
+      primary_method: "playwright"
+      fallback_methods: ["rss", "dom"]
+      rss_url: "https://www.bloter.net/feed"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 3
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: true
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 20
+      sections_count: 6
+      enabled: true
+
+  etnews:
+    name: "Electronic Times"
+    url: "https://www.etnews.com"
+    region: "kr"
+    language: "ko"
+    group: "D"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.etnews.com/rss"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 100
+      sections_count: 10
+      enabled: true
+
+  sciencetimes:
+    name: "Science Times"
+    url: "https://www.sciencetimes.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "D"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods: ["rss", "dom"]
+      rss_url: null
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 20
+      sections_count: 8
+      enabled: true
+
+  zdnet_kr:
+    name: "ZDNet Korea"
+    url: "https://www.zdnet.co.kr"
+    region: "kr"
+    language: "ko"
+    group: "D"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.zdnet.co.kr/rss"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 80
+      sections_count: 8
+      enabled: true
+
+  irobotnews:
+    name: "iRobot News"
+    url: "https://www.irobotnews.com"
+    region: "kr"
+    language: "ko"
+    group: "D"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.irobotnews.com/feed"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 10
+      sections_count: 5
+      enabled: true
+
+  techneedle:
+    name: "TechNeedle"
+    url: "https://www.techneedle.com"
+    region: "kr"
+    language: "ko"
+    group: "D"
+    crawl:
+      primary_method: "rss"
+      fallback_methods: ["sitemap", "dom"]
+      rss_url: "https://www.techneedle.com/feed"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 5
+      requires_proxy: true
+      proxy_region: "kr"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 5
+      sections_count: 5
+      enabled: true
+
+  marketwatch:
+    name: "MarketWatch"
+    url: "https://www.marketwatch.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.marketwatch.com/rss"
+      rss_sections:
+        - url: "https://feeds.marketwatch.com/marketwatch/topstories"
+          section: "top_stories"
+        - url: "https://feeds.marketwatch.com/marketwatch/marketpulse"
+          section: "market_pulse"
+        - url: "https://feeds.marketwatch.com/marketwatch/bulletins"
+          section: "bulletins"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 200
+      sections_count: 12
+      enabled: true
+
+  voakorea:
+    name: "VOA Korea"
+    url: "https://www.voakorea.com"
+    region: "us"
+    language: "ko"
+    group: "E"
+    crawl:
+      primary_method: "api"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: null  # API-style feeds, not standard RSS
+      api_feeds_page: "https://www.voakorea.com/rssfeeds"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 3
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 50
+      sections_count: 6
+      enabled: true
+
+  huffpost:
+    name: "HuffPost"
+    url: "https://www.huffpost.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+        - "playwright"
+      rss_url: null  # No confirmed RSS endpoint
+      sitemap_urls:
+        - "https://www.huffpost.com/static-assets/isolated/huffpostsitemapgeneratorjob-prod-public/us/sitemaps/sitemap-v1.xml"
+        - "https://www.huffpost.com/static-assets/isolated/huffpostsitemapgeneratorjob-prod-public/us/sitemaps/sitemap-google-news.xml"
+        - "https://www.huffpost.com/static-assets/isolated/huffpostsitemapgeneratorjob-prod-public/us/sitemaps/sections.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 100
+      sections_count: 15
+      enabled: true
+
+  nytimes:
+    name: "The New York Times"
+    url: "https://www.nytimes.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null  # RSS discontinued for general users ~2020
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 3
+      max_escalation_tier: 6
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "hard"
+      title_only: true
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Extreme"
+      daily_article_estimate: 300
+      sections_count: 20
+      enabled: true
+
+  ft:
+    name: "Financial Times"
+    url: "https://www.ft.com"
+    region: "uk"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null  # RSS requires FT subscription
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 3
+      max_escalation_tier: 6
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "hard"
+      title_only: true
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Extreme"
+      daily_article_estimate: 150
+      sections_count: 15
+      enabled: true
+
+  wsj:
+    name: "Wall Street Journal"
+    url: "https://www.wsj.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null  # RSS subscriber-only
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 3
+      max_escalation_tier: 6
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "hard"
+      title_only: true
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Extreme"
+      daily_article_estimate: 200
+      sections_count: 15
+      enabled: true
+
+  latimes:
+    name: "Los Angeles Times"
+    url: "https://www.latimes.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.latimes.com/rss2.0.xml"
+      rss_sections:
+        - url: "https://www.latimes.com/world-nation/rss2.0.xml"
+          section: "world"
+        - url: "https://www.latimes.com/politics/rss2.0.xml"
+          section: "politics"
+        - url: "https://www.latimes.com/california/rss2.0.xml"
+          section: "california"
+        - url: "https://www.latimes.com/business/rss2.0.xml"
+          section: "business"
+        - url: "https://www.latimes.com/entertainment-arts/rss2.0.xml"
+          section: "entertainment"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 150
+      sections_count: 15
+      enabled: true
+
+  buzzfeed:
+    name: "BuzzFeed"
+    url: "https://www.buzzfeed.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "playwright"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: null  # Blocked by robots.txt /*.xml$
+      sitemap_urls:  # 8 sitemaps from robots.txt
+        - "https://www.buzzfeed.com/sitemaps/buzzfeed/sitemap.xml"
+        - "https://www.buzzfeed.com/sitemaps/buzzfeed/news/sitemap.xml"
+        - "https://www.buzzfeed.com/sitemaps/tasty/sitemap.xml"
+      sitemap_url: "/sitemaps/buzzfeed/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null  # MSNBot: 120s, Slurp: 4s; use 10s as conservative default
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 3
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: true
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 50
+      sections_count: 10
+      enabled: true
+
+  nationalpost:
+    name: "National Post"
+    url: "https://nationalpost.com"
+    region: "us"  # Canada, but grouped with US/English
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://nationalpost.com/feed"
+      rss_sections:
+        - url: "https://nationalpost.com/category/news/feed"
+          section: "news"
+        - url: "https://nationalpost.com/category/opinion/feed"
+          section: "opinion"
+        - url: "https://nationalpost.com/category/politics/feed"
+          section: "politics"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 100
+      sections_count: 12
+      enabled: true
+
+  cnn:
+    name: "CNN"
+    url: "https://edition.cnn.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+        - "rss"
+      rss_url: "http://rss.cnn.com/rss/edition.rss"
+      sitemap_url: "/sitemaps/sitemap-index.xml"
+      sitemap_sections:
+        - "sitemap-articles-*.xml"       # News articles
+        - "sitemap-section-*.xml"        # Section pages
+        - "cnn-news-sitemap.xml"         # Google News sitemap
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 500
+      sections_count: 20
+      enabled: true
+
+  bloomberg:
+    name: "Bloomberg"
+    url: "https://www.bloomberg.com"
+    region: "us"
+    language: "en"
+    group: "E"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null  # No public RSS; requires account
+      sitemap_urls:  # 9 sitemaps from robots.txt (note: /sitemap.xml returns 403)
+        - "https://www.bloomberg.com/feeds/sitemap_news.xml"
+        - "https://www.bloomberg.com/feeds/sitemap_collection.xml"
+        - "https://www.bloomberg.com/feeds/sitemap_video.xml"
+        - "https://www.bloomberg.com/feeds/sitemap_audio.xml"
+        - "https://www.bloomberg.com/feeds/sitemap_people.xml"
+        - "https://www.bloomberg.com/feeds/sitemap_companies.xml"
+        - "https://www.bloomberg.com/feeds/sitemap_securities.xml"
+        - "https://www.bloomberg.com/feeds/sitemap_billionaires.xml"
+      sitemap_url: "/feeds/sitemap_news.xml"  # Use direct sitemap URL, not /sitemap.xml
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 3
+      max_escalation_tier: 6
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "hard"
+      title_only: true
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Extreme"
+      daily_article_estimate: 200
+      sections_count: 15
+      enabled: true
+
+  afmedios:
+    name: "AF Medios"
+    url: "https://afmedios.com"
+    region: "mx"
+    language: "es"
+    group: "E"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+      rss_url: "https://afmedios.com/rss"
+      sitemap_url: "/sitemap_index.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 3
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 20
+      sections_count: 6
+      enabled: true
+
+  people:
+    name: "People's Daily"
+    url: "http://www.people.com.cn"
+    region: "cn"
+    language: "zh"
+    group: "F"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null
+      sitemap_url: "http://www.people.cn/sitemap_index.xml"
+      rate_limit_seconds: 120
+      crawl_delay_mandatory: 120
+      max_requests_per_hour: 30
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 500
+      sections_count: 20
+      enabled: true
+
+  globaltimes:
+    name: "Global Times"
+    url: "https://www.globaltimes.cn"
+    region: "cn"
+    language: "en"
+    group: "F"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 3
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 40
+      sections_count: 4
+      enabled: true
+
+  scmp:
+    name: "South China Morning Post"
+    url: "https://www.scmp.com"
+    region: "cn"
+    language: "en"
+    group: "F"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.scmp.com/rss/91/feed"
+      sitemap_url: null  # /sitemap.xml returns 404; use robots.txt sitemap URLs
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: 10
+      max_requests_per_hour: 360
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 150
+      sections_count: 15
+      enabled: true
+
+  taiwannews:
+    name: "Taiwan News"
+    url: "https://www.taiwannews.com.tw"
+    region: "tw"
+    language: "en"
+    group: "F"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null
+      sitemap_url: "/sitemap_en.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 3
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 30
+      sections_count: 10
+      enabled: true
+
+  yomiuri:
+    name: "Yomiuri Shimbun"
+    url: "https://www.yomiuri.co.jp"
+    region: "jp"
+    language: "ja"
+    group: "F"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.yomiuri.co.jp/feed/"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 6
+      requires_proxy: true
+      proxy_region: "jp"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 200
+      sections_count: 15
+      enabled: true
+
+  thehindu:
+    name: "The Hindu"
+    url: "https://www.thehindu.com"
+    region: "in"
+    language: "en"
+    group: "F"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.thehindu.com/feeder/default.rss"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 100
+      sections_count: 15
+      enabled: true
+
+  thesun:
+    name: "The Sun"
+    url: "https://www.thesun.co.uk"
+    region: "uk"
+    language: "en"
+    group: "G"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.thesun.co.uk/feed/"
+      rss_section_feeds:
+        - "https://www.thesun.co.uk/news/feed/"
+        - "https://www.thesun.co.uk/money/feed/"
+        - "https://www.thesun.co.uk/tech/feed/"
+        - "https://www.thesun.co.uk/health/feed/"
+        - "https://www.thesun.co.uk/sport/feed/"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 6
+      requires_proxy: false
+      proxy_region: "uk"
+      proxy_requirement: "recommended"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 300
+      sections_count: 15
+      enabled: true
+
+  bild:
+    name: "Bild"
+    url: "https://www.bild.de"
+    region: "de"
+    language: "de"
+    group: "G"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.bild.de/rssfeeds/vw-alles/vw-alles-26970986,dzbildplus=false,sort=1,teaserbildmob498=true,view=rss2.bild.xml"
+      rss_section_feeds:
+        - "https://www.bild.de/rssfeeds/rss-16738684,dzbildplus=false,sort=1,view=rss2.bild.xml"
+        - "https://www.bild.de/rssfeeds/vw-politik/vw-politik-26971178,dzbildplus=false,sort=1,view=rss2.bild.xml"
+        - "https://www.bild.de/rssfeeds/vw-wirtschaft/vw-wirtschaft-26972740,dzbildplus=false,sort=1,view=rss2.bild.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 2
+      max_escalation_tier: 6
+      requires_proxy: true
+      proxy_region: "de"
+      proxy_requirement: "required"
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "soft-metered"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Hard"
+      daily_article_estimate: 200
+      sections_count: 10
+      enabled: true
+
+  lemonde:
+    name: "Le Monde"
+    url: "https://www.lemonde.fr"
+    region: "fr"
+    language: "fr"
+    group: "G"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+      rss_url: "https://www.lemonde.fr/rss/une.xml"
+      rss_section_feeds:
+        - "https://www.lemonde.fr/rss/en_continu.xml"
+        - "https://www.lemonde.fr/international/rss_full.xml"
+        - "https://www.lemonde.fr/politique/rss_full.xml"
+        - "https://www.lemonde.fr/economie/rss_full.xml"
+      rss_english_feed: "https://www.lemonde.fr/en/rss/une.xml"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 240
+      jitter_seconds: 3
+    anti_block:
+      ua_tier: 3
+      default_escalation_tier: 3
+      max_escalation_tier: 6
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "hard"
+      title_only: true
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Extreme"
+      daily_article_estimate: 150
+      sections_count: 15
+      enabled: true
+
+  themoscowtimes:
+    name: "The Moscow Times"
+    url: "https://www.themoscowtimes.com"
+    region: "ru"
+    language: "en"
+    group: "G"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+      rss_url: "https://www.themoscowtimes.com/rss/news"
+      rss_section_feeds:
+        - "https://www.themoscowtimes.com/rss/news"
+        - "https://www.themoscowtimes.com/rss/opinion"
+        - "https://www.themoscowtimes.com/rss/city"
+        - "https://www.themoscowtimes.com/rss/meanwhile"
+      sitemap_url: "https://static.themoscowtimes.com/sitemap/sitemap.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 3
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 20
+      sections_count: 9
+      enabled: true
+
+  arabnews:
+    name: "Arab News"
+    url: "https://www.arabnews.com"
+    region: "me"
+    language: "en"
+    group: "G"
+    crawl:
+      primary_method: "sitemap"
+      fallback_methods:
+        - "dom"
+      rss_url: null  # RSS returns 403
+      sitemap_url: "/sitemap.xml"
+      sitemap_news_url: "/sitemap-news.xml"
+      rate_limit_seconds: 10
+      crawl_delay_mandatory: 10  # robots.txt Crawl-delay: 10
+      max_requests_per_hour: 360
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: "me"
+      proxy_requirement: "recommended"
+      bot_block_level: "MEDIUM"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 100
+      sections_count: 12
+      enabled: true
+
+  aljazeera:
+    name: "Al Jazeera English"
+    url: "https://www.aljazeera.com"
+    region: "me"
+    language: "en"
+    group: "G"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+        - "dom"
+      rss_url: "https://www.aljazeera.com/xml/rss/all.xml"
+      rss_alternate: "https://www.aljazeera.com/rss"
+      sitemap_url: "/sitemap.xml"
+      sitemap_date_pattern: "/sitemap.xml?yyyy={year}&mm={month}&dd={day}"
+      rate_limit_seconds: 5
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 720
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 2
+      default_escalation_tier: 1
+      max_escalation_tier: 5
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "HIGH"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Medium"
+      daily_article_estimate: 100
+      sections_count: 12
+      enabled: true
+
+  israelhayom:
+    name: "Israel Hayom"
+    url: "https://www.israelhayom.com"
+    region: "il"
+    language: "en"
+    group: "G"
+    crawl:
+      primary_method: "rss"
+      fallback_methods:
+        - "sitemap"
+      rss_url: "https://www.israelhayom.com/feed"
+      sitemap_url: "/sitemap.xml"
+      rate_limit_seconds: 2
+      crawl_delay_mandatory: null
+      max_requests_per_hour: 1800
+      jitter_seconds: 0
+    anti_block:
+      ua_tier: 1
+      default_escalation_tier: 1
+      max_escalation_tier: 3
+      requires_proxy: false
+      proxy_region: null
+      bot_block_level: "LOW"
+    extraction:
+      paywall_type: "none"
+      title_only: false
+      rendering_required: false
+      charset: "utf-8"
+    meta:
+      difficulty_tier: "Easy"
+      daily_article_estimate: 30
+      sections_count: 5
+      enabled: true
+

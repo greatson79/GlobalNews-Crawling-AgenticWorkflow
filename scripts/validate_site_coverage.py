@@ -22,22 +22,25 @@ import sys
 # If sources.yaml exists, extract from there instead
 # ---------------------------------------------------------------------------
 DEFAULT_SITES = [
-    # Korean Major (19)
-    "chosun.com", "joongang.co.kr", "donga.com", "hani.co.kr", "khan.co.kr",
-    "news.kbs.co.kr", "imnews.imbc.com", "news.sbs.co.kr", "ytn.co.kr", "yna.co.kr",
-    "news1.kr", "newsis.com", "mk.co.kr",  "hankyung.com", "sedaily.com",
-    "news.naver.com", "news.daum.net", "biz.chosun.com", "mt.co.kr",
-    # Korean IT/Tech (8)
-    "zdnet.co.kr", "itworld.co.kr", "bloter.net", "etnews.com",
-    "ddaily.co.kr", "aitimes.com", "techm.kr", "byline.network",
-    # English (5)
-    "reuters.com", "apnews.com", "bbc.com", "cnn.com", "theguardian.com",
-    # English Paywall (4)
-    "bloomberg.com", "wsj.com", "nytimes.com", "ft.com",
-    # Asia-Pacific (4)
-    "nhk.or.jp", "asahi.com", "xinhuanet.com", "scmp.com",
-    # Europe/Middle East (4)
-    "aljazeera.com", "dw.com", "france24.com", "lemonde.fr",
+    # Group A: Korean Major Dailies (5)
+    "chosun.com", "joongang.co.kr", "donga.com", "hani.co.kr", "yna.co.kr",
+    # Group B: Korean Economy (4)
+    "mk.co.kr", "hankyung.com", "fnnews.com", "mt.co.kr",
+    # Group C: Korean Niche (3)
+    "nocutnews.co.kr", "kmib.co.kr", "ohmynews.com",
+    # Group D: Korean IT/Science (7)
+    "38north.org", "bloter.net", "etnews.com", "sciencetimes.co.kr",
+    "zdnet.co.kr", "irobotnews.com", "techneedle.com",
+    # Group E: US/English Major (12)
+    "marketwatch.com", "voakorea.com", "huffingtonpost.com", "nytimes.com",
+    "ft.com", "wsj.com", "latimes.com", "buzzfeed.com",
+    "nationalpost.com", "edition.cnn.com", "bloomberg.com", "afmedios.com",
+    # Group F: Asia-Pacific (6)
+    "people.com.cn", "globaltimes.cn", "scmp.com", "taiwannews.com",
+    "yomiuri.co.jp", "thehindu.com",
+    # Group G: Europe/Middle East (7)
+    "thesun.co.uk", "bild.de", "lemonde.fr", "themoscowtimes.com",
+    "arabnews.com", "aljazeera.com", "israelhayom.com",
 ]
 
 

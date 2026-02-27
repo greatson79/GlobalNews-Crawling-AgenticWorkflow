@@ -1,0 +1,105 @@
+{
+  "generated": "2026-02-26T05:01:58Z",
+  "strategy_group": "english",
+  "description": "US/English major news sites",
+  "assigned_agent": "@crawl-strategist-en",
+  "focus_areas": "Fundus/Trafilatura compatibility, paywall handling (nytimes/ft/wsj/bloomberg)",
+  "site_count": 12,
+  "sites": [
+    {
+      "domain": "marketwatch.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "",
+      "recon_row": "| 20 | marketwatch.com | Y — /rss | Y — /sitemap.xml | SSR (Dow Jones) | soft-metered | HIGH | en | ~12 | ~200 | Hard |"
+    },
+    {
+      "domain": "voakorea.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "",
+      "recon_row": "| 21 | voakorea.com | Y — /rssfeeds (17 category feeds) | Y — /sitemap.xml | SSR | none | LOW | ko/en | ~6 | ~50 | Easy |"
+    },
+    {
+      "domain": "huffingtonpost.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "nytimes.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "Paywall — requires undetected-chromedriver",
+      "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
+    },
+    {
+      "domain": "ft.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "Paywall — requires undetected-chromedriver",
+      "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
+    },
+    {
+      "domain": "wsj.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "Paywall — requires undetected-chromedriver",
+      "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
+    },
+    {
+      "domain": "latimes.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "",
+      "recon_row": "| 26 | latimes.com | Y — /rss | Y — /sitemap.xml | SSR | soft-metered | HIGH | en | ~15 | ~150 | Medium |"
+    },
+    {
+      "domain": "buzzfeed.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "",
+      "recon_row": "| buzzfeed.com | Playwright (CSR/React SPA) |"
+    },
+    {
+      "domain": "nationalpost.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "",
+      "recon_row": "| 28 | nationalpost.com | Y — /feed | Y — /sitemap.xml | SSR | soft-metered | HIGH | en | ~12 | ~100 | Hard |"
+    },
+    {
+      "domain": "edition.cnn.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "",
+      "recon_row": "| 29 | edition.cnn.com | Y — 15 sitemaps | Y — sitemap index | SSR | none | HIGH | en | ~20 | ~500 | Medium |"
+    },
+    {
+      "domain": "bloomberg.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "Paywall — requires undetected-chromedriver",
+      "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
+    },
+    {
+      "domain": "afmedios.com",
+      "language": "es",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "Spanish-language",
+      "recon_row": "| 31 | afmedios.com | Y — /rss (RSS 2.0, 20 items) | Y — sitemap_index.xml | SSR (WordPress) | none | LOW | es | ~6 | ~20 | Easy |"
+    }
+  ]
+}

@@ -1,0 +1,320 @@
+# Analysis Pipeline Configuration
+# 8-stage NLP pipeline for GlobalNews Crawling & Analysis System
+#
+# Generated from Step 7: Analysis Pipeline Detailed Design
+# Source: planning/analysis-pipeline-design.md
+# Schema: Step 5 Architecture Blueprint, Section 5d
+#
+# Total processing time: ~30 min for 1,000 articles
+# Peak memory: ~2.4 GB (within 10 GB budget)
+# 56 analysis techniques across 8 stages
+
+pipeline:
+  version: "1.0"
+  python_version: "3.12"
+
+  global:
+    max_memory_gb: 10               # PRD C3: MacBook M2 Pro 16GB, 10 GB pipeline limit
+    log_level: "INFO"               # DEBUG | INFO | WARNING | ERROR
+    gc_between_stages: true         # Force gc.collect() between stages (Step 5 architecture)
+    parquet_compression: "zstd"     # ZSTD compression for all Parquet output
+    parquet_compression_level: 3    # ZSTD compression level
+    batch_size_default: 500         # Default batch size for article processing
+
+  stages:
+    # =========================================================================
+    # Stage 1: Preprocessing
+    # Korean: Kiwi morpheme analysis; English: spaCy lemmatization
+    # Techniques: T01-T06
+    # =========================================================================
+    stage_1_preprocessing:
+      enabled: true
+      description: "Korean: Kiwi morpheme analysis; English: spaCy lemmatization; language detection"
+      input_format: "jsonl"
+      output_format: "parquet"
+      output_path: "data/processed/articles.parquet"
+      parallelism: 1
+      memory_limit_gb: 1.5           # Kiwi ~760 MB + spaCy ~200 MB + overhead
+      timeout_seconds: 1800          # 30 minutes max
+      models:
+        - name: "kiwipiepy"
+          version: "0.22.2"
+          singleton: true            # Step 2 R2: mandatory singleton
+          warmup: true               # Pre-load and warm up
+        - name: "spacy_en_core_web_sm"
+          version: "3.7+"
+          singleton: true
+          warmup: false
+      dependencies: []               # No stage dependencies (first stage)
+
+    # =========================================================================
+    # Stage 2: Feature Extraction
+    # SBERT embeddings (384-dim), TF-IDF, NER, KeyBERT
+    # Techniques: T07-T12
+    # =========================================================================
+    stage_2_features:
+      enabled: true
+      description: "SBERT embeddings, TF-IDF, NER, KeyBERT keyword extraction"
+      input_format: "parquet"
+      output_format: "parquet"
+      output_paths:
+        - "data/features/embeddings.parquet"
+        - "data/features/tfidf.parquet"
+        - "data/features/ner.parquet"
+      parallelism: 1
+      memory_limit_gb: 2.5           # SBERT ~1.1 GB + KeyBERT ~20 MB + NER ~500 MB
+      timeout_seconds: 3600          # 1 hour max
+      sbert_batch_size: 64           # Step 2 R4: 64 for M2 Pro 16GB
+      tfidf_max_features: 10000
+      tfidf_ngram_range: [1, 2]
+      ner_batch_size: 32
+      keybert_top_n: 10
+      models:
+        - name: "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+          version: "3.0+"
+          singleton: true
+          warmup: true
+        - name: "keybert"
+          version: "0.9.0"
+          singleton: true
+          warmup: false              # Shares SBERT model (Step 2 R5)
+        - name: "Davlan/xlm-roberta-base-ner-hrl"
+          version: "latest"
+          singleton: true
+          warmup: true
+      dependencies:
+        - "stage_1_preprocessing"
+
+    # =========================================================================
+    # Stage 3: Per-Article Analysis
+    # Sentiment, Plutchik 8-emotion, zero-shot STEEPS, importance scoring
+    # Techniques: T13-T19, T49
+    # =========================================================================
+    stage_3_article:
+      enabled: true
+      description: "Sentiment, Plutchik 8-emotion, zero-shot STEEPS classification, importance scoring"
+      input_format: "parquet"
+      output_format: "parquet"
+      output_path: "data/analysis/article_analysis.parquet"
+      parallelism: 1
+      memory_limit_gb: 2.0           # Sentiment model ~500 MB + zero-shot ~500 MB
+      timeout_seconds: 3600
+      plutchik_emotions:
+        - "joy"
+        - "trust"
+        - "fear"
+        - "surprise"
+        - "sadness"
+        - "disgust"
+        - "anger"
+        - "anticipation"
+      steeps_categories:
+        - "Social issue"
+        - "Technology development"
+        - "Economic trend"
+        - "Environmental concern"
+        - "Political event"
+        - "Security threat"
+      importance_weights:
+        authority: 0.25
+        entity_density: 0.20
+        coverage: 0.25
+        recency: 0.15
+        extremity: 0.15
+      paywall_importance_penalty: -20
+      models:
+        - name: "monologg/koelectra-base-finetuned-naver-ner"
+          version: "latest"
+          singleton: true
+          warmup: true
+        - name: "facebook/bart-large-mnli"
+          version: "latest"
+          singleton: true
+          warmup: true
+      dependencies:
+        - "stage_2_features"
+
+    # =========================================================================
+    # Stage 4: Aggregation
+    # BERTopic, HDBSCAN, NMF/LDA, k-means, hierarchical, Louvain
+    # Techniques: T21-T28
+    # =========================================================================
+    stage_4_aggregation:
+      enabled: true
+      description: "BERTopic topic modeling, Dynamic Topic Modeling, HDBSCAN clustering, NMF/LDA, community detection"
+      input_format: "parquet"
+      output_format: "parquet"
+      output_paths:
+        - "data/analysis/topics.parquet"
+        - "data/analysis/networks.parquet"
+      parallelism: 1
+      memory_limit_gb: 3.0           # BERTopic ~1.2 GB (shared SBERT) + HDBSCAN + network libs
+      timeout_seconds: 3600
+      min_articles_for_topics: 50    # Minimum articles for topic modeling
+      bertopic_config:
+        nr_topics: "auto"
+        min_topic_size: 5
+        calculate_probabilities: true
+      hdbscan_config:
+        min_cluster_size: 10
+        min_samples: 5
+        metric: "cosine"
+      nmf_components: 20
+      lda_components: 20
+      models:
+        - name: "bertopic"
+          version: "0.17.4"
+          singleton: true
+          warmup: false
+          sbert_sharing: true        # Step 2 R5: share SBERT model
+      dependencies:
+        - "stage_3_article"
+
+    # =========================================================================
+    # Stage 5: Time Series Analysis
+    # STL, Kleinberg burst, PELT changepoint, Prophet, wavelet, ARIMA, MA
+    # Techniques: T29-T36
+    # =========================================================================
+    stage_5_timeseries:
+      enabled: true
+      description: "STL decomposition, Kleinberg burst, PELT changepoint, Prophet forecast, wavelet analysis"
+      input_format: "parquet"
+      output_format: "parquet"
+      output_path: "data/analysis/timeseries.parquet"
+      parallelism: 1
+      memory_limit_gb: 1.5           # Time series libs are lightweight
+      timeout_seconds: 1800
+      min_days_for_analysis: 7       # L1 minimum 7 days
+      forecast_horizon_days: 30      # Prophet forecast horizon
+      stl_period: 7                  # Weekly seasonality
+      kleinberg_params:
+        s: 2.0                       # Base transition cost
+        gamma: 1.0
+      pelt_params:
+        model: "rbf"
+        min_size: 3
+        jump: 1
+      prophet_params:
+        yearly_seasonality: false
+        weekly_seasonality: true
+        daily_seasonality: false
+      wavelet_params:
+        wavelet: "db4"
+        level: 4
+      ma_short_window: 3             # 3-day moving average
+      ma_long_window: 14             # 14-day moving average
+      models: []                     # No heavy ML models; statistical methods only
+      dependencies:
+        - "stage_4_aggregation"
+
+    # =========================================================================
+    # Stage 6: Cross Analysis
+    # Granger, PCMCI, co-occurrence, cross-lingual, frame, agenda, temporal
+    # Techniques: T37-T46, T20, T50
+    # =========================================================================
+    stage_6_cross:
+      enabled: true
+      description: "Granger causality, PCMCI, co-occurrence networks, cross-lingual topic alignment, frame analysis"
+      input_format: "parquet"
+      output_format: "parquet"
+      output_path: "data/analysis/cross_analysis.parquet"
+      parallelism: 1
+      memory_limit_gb: 2.0           # Network analysis + causal inference
+      timeout_seconds: 3600
+      min_articles_for_granger: 100  # Minimum articles for Granger test
+      granger_max_lag: 7             # Maximum lag in days
+      granger_significance: 0.05
+      pcmci_params:
+        tau_max: 7
+        pc_alpha: 0.05
+      cross_lingual_threshold: 0.5  # Cosine similarity threshold for topic alignment
+      top_topics_for_analysis: 20
+      models: []
+      dependencies:
+        - "stage_5_timeseries"
+
+    # =========================================================================
+    # Stage 7: Signal Classification (5-Layer)
+    # L1 Fad, L2 Short-term, L3 Mid-term, L4 Long-term, L5 Singularity
+    # Techniques: T47-T48, T51-T55
+    # =========================================================================
+    stage_7_signals:
+      enabled: true
+      description: "5-Layer signal classification (L1-L5), novelty detection (LOF/IF), BERTrend weak signal detection"
+      input_format: "parquet"
+      output_format: "parquet"
+      output_path: "data/output/signals.parquet"
+      parallelism: 1
+      memory_limit_gb: 1.5           # Classification rules + LOF/IF
+      timeout_seconds: 1800
+      signal_confidence_threshold: 0.5
+      novelty_detection:
+        lof_n_neighbors: 20
+        lof_contamination: 0.05
+        isolation_forest_contamination: 0.05
+        ensemble_weight_lof: 0.5
+        ensemble_weight_if: 0.5
+        novelty_threshold: 0.7
+      bertrend_lifecycle:
+        noise_to_weak_max_articles_per_day: 5
+        weak_to_emerging_volume_doubling_days: 7
+        weak_to_emerging_min_sources: 2
+        emerging_to_strong_min_articles_per_day: 20
+        emerging_to_strong_sustained_days: 14
+        strong_to_declining_volume_drop_pct: 50
+        strong_to_declining_period_days: 14
+      singularity_weights:
+        ood_score: 0.20
+        changepoint_significance: 0.15
+        cross_domain_emergence: 0.20
+        bertrend_transition: 0.15
+        entropy_spike: 0.10
+        novelty_score: 0.10
+        network_anomaly: 0.10
+      singularity_threshold: 0.65
+      singularity_pathways_required: 2  # At least 2 of 3 independent pathways
+      layer_thresholds:
+        L1_volume_zscore: 3.0
+        L1_burst_score: 2.0
+        L2_sustained_days: 7
+        L3_changepoint_significance: 0.8
+        L3_modularity_delta: 0.1
+        L4_embedding_drift: 0.3
+        L4_wavelet_period: 90
+        L4_min_data_days: 365
+        L5_novelty_score: 0.7
+        L5_cross_domain_count: 2
+      models: []
+      dependencies:
+        - "stage_6_cross"
+
+    # =========================================================================
+    # Stage 8: Data Output
+    # Final Parquet merge (ZSTD), SQLite FTS5 + vec index, DuckDB check
+    # Technique: T56 (SetFit merge)
+    # =========================================================================
+    stage_8_output:
+      enabled: true
+      description: "Final Parquet merge (ZSTD), SQLite FTS5 + vec index, DuckDB compatibility check"
+      input_format: "parquet"
+      output_format: "parquet+sqlite"
+      output_paths:
+        - "data/output/analysis.parquet"
+        - "data/output/signals.parquet"
+        - "data/output/index.sqlite"
+      parallelism: 1
+      memory_limit_gb: 2.0           # Parquet merge + SQLite write
+      timeout_seconds: 1800
+      sqlite_fts_tokenizer: "unicode61"
+      sqlite_vec_dimensions: 384     # SBERT embedding dimensions
+      duckdb_verification: true
+      data_quality_checks:
+        check_duplicate_article_ids: true
+        check_signal_topic_references: true
+        check_embedding_dimensions: true
+        check_schema_types: true
+        check_not_null_completeness: true
+        max_invalid_pct_before_halt: 10
+      models: []
+      dependencies:
+        - "stage_7_signals"

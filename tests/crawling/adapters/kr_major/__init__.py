@@ -1,0 +1,1 @@
+# Korean major adapter tests

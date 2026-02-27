@@ -1,0 +1,989 @@
+"""3-Tier URL Discovery: RSS/Sitemap parsing, DOM navigation, Playwright fallback.
+
+Discovers article URLs from news sites using a tiered fallback strategy:
+    - Tier 1: RSS/Atom feeds and XML sitemaps (fastest, ~60-70% coverage)
+    - Tier 2: DOM navigation with BeautifulSoup (CSS selectors on listing pages)
+    - Tier 3: Playwright/Patchright dynamic rendering (JS-heavy sites)
+
+The discovery pipeline runs Tier 1 -> Tier 2 -> Tier 3 with deduplication at
+each stage. Lower tiers are only attempted if higher tiers yield insufficient URLs.
+
+Reference:
+    Step 5 Architecture Blueprint, Layer 2 (Crawling Layer).
+    Step 6 Crawling Strategies (Per-Site method assignments).
+"""
+
+from __future__ import annotations
+
+import re
+import xml.etree.ElementTree as ET
+from datetime import datetime, timezone, timedelta
+from typing import Any
+from urllib.parse import urljoin, urlparse, urlunparse, parse_qs, urlencode
+
+from src.crawling.contracts import DiscoveredURL
+from src.crawling.network_guard import NetworkGuard
+from src.utils.error_handler import ParseError, NetworkError
+
+import logging
+
+logger = logging.getLogger(__name__)
+
+# XML namespaces for sitemap parsing
+SITEMAP_NS = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
+SITEMAP_NEWS_NS = {"news": "http://www.google.com/schemas/sitemap-news/0.9"}
+
+# Tracking parameters to strip during URL normalization
+TRACKING_PARAMS = frozenset({
+    "utm_source", "utm_medium", "utm_campaign", "utm_term", "utm_content",
+    "utm_id", "utm_source_platform", "utm_creative_format",
+    "fbclid", "gclid", "gclsrc", "msclkid", "dclid",
+    "mc_cid", "mc_eid", "oly_enc_id", "oly_anon_id",
+    "_ga", "_gl", "_hsenc", "_hsmi", "__s",
+    "ref", "referer", "referrer", "source",
+    "amp", "amp_js_v", "usqp",
+    "icid", "int_cmp", "clickid",
+})
+
+
+# ---------------------------------------------------------------------------
+# URL Normalization
+# ---------------------------------------------------------------------------
+
+def normalize_url(url: str, base_url: str = "") -> str:
+    """Normalize a URL by resolving relative paths, lowercasing host,
+    stripping tracking parameters, and sorting remaining query params.
+
+    Args:
+        url: The URL to normalize (may be relative).
+        base_url: Base URL for resolving relative URLs.
+
+    Returns:
+        Normalized absolute URL string, or empty string if URL is invalid.
+    """
+    if not url or not url.strip():
+        return ""
+
+    url = url.strip()
+
+    # Resolve relative URLs
+    if base_url and not url.startswith(("http://", "https://")):
+        url = urljoin(base_url, url)
+
+    # Must start with http:// or https://
+    if not url.startswith(("http://", "https://")):
+        return ""
+
+    try:
+        parsed = urlparse(url)
+    except ValueError:
+        return ""
+
+    # Lowercase the hostname
+    hostname = (parsed.hostname or "").lower()
+    if not hostname:
+        return ""
+
+    # Strip www. prefix for consistency
+    # (commented out -- some sites use www as a distinct subdomain)
+    # hostname = hostname.removeprefix("www.")
+
+    # Strip tracking parameters and sort remaining
+    if parsed.query:
+        params = parse_qs(parsed.query, keep_blank_values=False)
+        filtered = {
+            k: v for k, v in params.items()
+            if k.lower() not in TRACKING_PARAMS
+        }
+        # Sort params for consistency
+        sorted_query = urlencode(
+            {k: v[0] if len(v) == 1 else v for k, v in sorted(filtered.items())},
+            doseq=True,
+        )
+    else:
+        sorted_query = ""
+
+    # Strip fragment
+    # Normalize path: remove trailing slash on paths (except root)
+    path = parsed.path or "/"
+    if path != "/" and path.endswith("/"):
+        path = path.rstrip("/")
+
+    # Reconstruct
+    normalized = urlunparse((
+        parsed.scheme,
+        hostname + (f":{parsed.port}" if parsed.port and parsed.port not in (80, 443) else ""),
+        path,
+        "",  # params (rarely used)
+        sorted_query,
+        "",  # fragment stripped
+    ))
+
+    return normalized
+
+
+def is_article_url(url: str, source_url: str = "") -> bool:
+    """Heuristic check if a URL is likely an article page vs navigation/category.
+
+    Filters out URLs that are clearly not articles (homepage, category pages,
+    image URLs, JS/CSS assets, etc.).
+
+    Args:
+        url: The URL to check.
+        source_url: The site's base URL for context.
+
+    Returns:
+        True if the URL looks like an article URL.
+    """
+    if not url:
+        return False
+
+    parsed = urlparse(url)
+    path = parsed.path.lower()
+
+    # Skip non-HTML resources
+    non_article_extensions = (
+        ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico",
+        ".css", ".js", ".json", ".xml", ".rss", ".atom",
+        ".pdf", ".zip", ".tar", ".gz",
+        ".mp3", ".mp4", ".avi", ".mov",
+        ".woff", ".woff2", ".ttf", ".eot",
+    )
+    if any(path.endswith(ext) for ext in non_article_extensions):
+        return False
+
+    # Skip common non-article paths
+    non_article_paths = (
+        "/tag/", "/tags/", "/category/", "/categories/",
+        "/author/", "/authors/", "/page/", "/search",
+        "/login", "/signup", "/register", "/subscribe",
+        "/about", "/contact", "/privacy", "/terms",
+        "/sitemap", "/robots.txt", "/feed", "/rss",
+        "/wp-admin", "/wp-login", "/wp-content",
+    )
+    if any(segment in path for segment in non_article_paths):
+        return False
+
+    # Very short paths are usually not articles (homepage, section pages)
+    # e.g., "/", "/news/", "/politics/"
+    path_segments = [s for s in path.split("/") if s]
+    if len(path_segments) < 2:
+        return False
+
+    return True
+
+
+# ---------------------------------------------------------------------------
+# Tier 1: RSS/Atom Feed Parser
+# ---------------------------------------------------------------------------
+
+class RSSParser:
+    """Parse RSS 2.0 and Atom feeds to extract article URLs.
+
+    Uses feedparser library for robust feed parsing. Falls back to
+    raw XML parsing if feedparser is not available.
+
+    Args:
+        network_guard: NetworkGuard instance for fetching feeds.
+    """
+
+    def __init__(self, network_guard: NetworkGuard) -> None:
+        self._guard = network_guard
+
+    def parse_feed(
+        self,
+        feed_url: str,
+        source_id: str,
+        max_age_days: int = 1,
+    ) -> list[DiscoveredURL]:
+        """Fetch and parse an RSS/Atom feed.
+
+        Args:
+            feed_url: URL of the RSS/Atom feed.
+            source_id: Site identifier for rate limiting.
+            max_age_days: Only include articles published within this many days.
+                Defaults to 1 (24h lookback for daily execution).
+
+        Returns:
+            List of DiscoveredURL objects extracted from the feed.
+
+        Raises:
+            ParseError: If the feed cannot be parsed.
+            NetworkError: If the feed cannot be fetched.
+        """
+        try:
+            import feedparser
+        except ImportError:
+            logger.warning("feedparser_not_available source_id=%s", source_id)
+            return self._parse_feed_raw(feed_url, source_id, max_age_days)
+
+        try:
+            response = self._guard.fetch(feed_url, site_id=source_id)
+        except NetworkError as e:
+            logger.error("rss_fetch_failed url=%s source_id=%s error=%s", feed_url, source_id, str(e))
+            raise
+
+        feed = feedparser.parse(response.text)
+
+        if feed.bozo and not feed.entries:
+            logger.warning(
+                "rss_parse_error url=%s source_id=%s error=%s",
+                feed_url, source_id,
+                str(feed.bozo_exception) if hasattr(feed, "bozo_exception") else "unknown",
+            )
+
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        results: list[DiscoveredURL] = []
+
+        for entry in feed.entries:
+            url = entry.get("link", "")
+            if not url:
+                continue
+
+            normalized = normalize_url(url)
+            if not normalized or not is_article_url(normalized):
+                continue
+
+            # Extract publication date
+            pub_date = self._parse_feed_date(entry)
+
+            # Apply freshness filter
+            if pub_date and pub_date < cutoff:
+                continue
+
+            title_hint = entry.get("title", None)
+
+            results.append(DiscoveredURL(
+                url=normalized,
+                source_id=source_id,
+                discovered_via="rss",
+                published_at=pub_date,
+                title_hint=title_hint,
+                priority=0,
+            ))
+
+        logger.info(
+            "rss_parsed url=%s source_id=%s entries_total=%s articles_found=%s",
+            feed_url, source_id, len(feed.entries), len(results),
+        )
+        return results
+
+    def _parse_feed_date(self, entry: Any) -> datetime | None:
+        """Extract publication date from a feed entry.
+
+        Args:
+            entry: feedparser entry object.
+
+        Returns:
+            Parsed datetime in UTC, or None if not available.
+        """
+        # feedparser provides parsed time tuples
+        for date_field in ("published_parsed", "updated_parsed", "created_parsed"):
+            parsed_time = getattr(entry, date_field, None)
+            if parsed_time:
+                try:
+                    import calendar
+                    timestamp = calendar.timegm(parsed_time)
+                    return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                except (ValueError, OverflowError, TypeError):
+                    continue
+
+        # Fallback to string parsing
+        for date_field in ("published", "updated", "created"):
+            date_str = entry.get(date_field, "")
+            if date_str:
+                parsed = _parse_datetime_string(date_str)
+                if parsed:
+                    return parsed
+
+        return None
+
+    def _parse_feed_raw(
+        self,
+        feed_url: str,
+        source_id: str,
+        max_age_days: int = 1,
+    ) -> list[DiscoveredURL]:
+        """Fallback RSS parser using raw XML parsing (no feedparser dependency).
+
+        Args:
+            feed_url: URL of the RSS feed.
+            source_id: Site identifier.
+            max_age_days: Freshness filter.
+
+        Returns:
+            List of DiscoveredURL objects.
+        """
+        try:
+            response = self._guard.fetch(feed_url, site_id=source_id)
+        except NetworkError as e:
+            logger.error("rss_raw_fetch_failed url=%s error=%s", feed_url, str(e))
+            return []
+
+        try:
+            root = ET.fromstring(response.text)
+        except ET.ParseError as e:
+            logger.warning("rss_raw_parse_error url=%s error=%s", feed_url, str(e))
+            return []
+
+        results: list[DiscoveredURL] = []
+        # RSS 2.0: <item><link>...<pubDate>...
+        for item in root.iter("item"):
+            link_el = item.find("link")
+            if link_el is None or not link_el.text:
+                continue
+            url = normalize_url(link_el.text.strip())
+            if not url or not is_article_url(url):
+                continue
+
+            title_el = item.find("title")
+            title_hint = title_el.text.strip() if title_el is not None and title_el.text else None
+
+            pub_el = item.find("pubDate")
+            pub_date = None
+            if pub_el is not None and pub_el.text:
+                pub_date = _parse_datetime_string(pub_el.text.strip())
+
+            results.append(DiscoveredURL(
+                url=url,
+                source_id=source_id,
+                discovered_via="rss",
+                published_at=pub_date,
+                title_hint=title_hint,
+            ))
+
+        # Atom: <entry><link href="..."><published>...
+        for ns_prefix in ("", "{http://www.w3.org/2005/Atom}"):
+            for entry in root.iter(f"{ns_prefix}entry"):
+                link_el = entry.find(f"{ns_prefix}link")
+                href = ""
+                if link_el is not None:
+                    href = link_el.get("href", "")
+                if not href:
+                    continue
+                url = normalize_url(href)
+                if not url or not is_article_url(url):
+                    continue
+
+                title_el = entry.find(f"{ns_prefix}title")
+                title_hint = title_el.text.strip() if title_el is not None and title_el.text else None
+
+                pub_el = entry.find(f"{ns_prefix}published")
+                if pub_el is None:
+                    pub_el = entry.find(f"{ns_prefix}updated")
+                pub_date = None
+                if pub_el is not None and pub_el.text:
+                    pub_date = _parse_datetime_string(pub_el.text.strip())
+
+                results.append(DiscoveredURL(
+                    url=url,
+                    source_id=source_id,
+                    discovered_via="rss",
+                    published_at=pub_date,
+                    title_hint=title_hint,
+                ))
+
+        logger.info("rss_raw_parsed url=%s source_id=%s articles_found=%s", feed_url, source_id, len(results))
+        return results
+
+
+# ---------------------------------------------------------------------------
+# Tier 1: Sitemap Parser
+# ---------------------------------------------------------------------------
+
+class SitemapParser:
+    """Parse XML sitemaps (including sitemap index files) to discover article URLs.
+
+    Handles:
+        - Standard XML sitemaps (<urlset>)
+        - Sitemap index files (<sitemapindex>)
+        - Google News sitemaps (with news: namespace)
+        - Date-based filtering (lastmod)
+
+    Args:
+        network_guard: NetworkGuard instance for fetching sitemaps.
+    """
+
+    def __init__(self, network_guard: NetworkGuard) -> None:
+        self._guard = network_guard
+
+    def parse_sitemap(
+        self,
+        sitemap_url: str,
+        source_id: str,
+        base_url: str = "",
+        max_age_days: int = 1,
+        max_urls: int = 5000,
+        url_pattern: str | None = None,
+    ) -> list[DiscoveredURL]:
+        """Fetch and parse an XML sitemap, recursing into sitemap indexes.
+
+        Args:
+            sitemap_url: URL or path of the sitemap. If relative, resolved against base_url.
+            source_id: Site identifier for rate limiting.
+            base_url: Base URL for resolving relative sitemap URLs.
+            max_age_days: Only include URLs with lastmod within this many days.
+            max_urls: Maximum number of URLs to collect (prevents memory issues).
+            url_pattern: Optional regex pattern to filter URLs (e.g., "/article/").
+
+        Returns:
+            List of DiscoveredURL objects from the sitemap.
+        """
+        # Resolve relative sitemap URL
+        if not sitemap_url.startswith(("http://", "https://")):
+            if base_url:
+                sitemap_url = urljoin(base_url, sitemap_url)
+            else:
+                logger.warning("sitemap_relative_url url=%s source_id=%s", sitemap_url, source_id)
+                return []
+
+        try:
+            response = self._guard.fetch(sitemap_url, site_id=source_id)
+        except (NetworkError, Exception) as e:
+            logger.error("sitemap_fetch_failed url=%s source_id=%s error=%s", sitemap_url, source_id, str(e))
+            return []
+
+        try:
+            root = ET.fromstring(response.text)
+        except ET.ParseError as e:
+            logger.warning("sitemap_parse_error url=%s source_id=%s error=%s", sitemap_url, source_id, str(e))
+            return []
+
+        # Strip namespace for easier parsing
+        tag = root.tag
+        if "}" in tag:
+            tag = tag.split("}")[-1]
+
+        if tag == "sitemapindex":
+            return self._parse_sitemap_index(
+                root, source_id, base_url, max_age_days, max_urls, url_pattern
+            )
+        elif tag == "urlset":
+            return self._parse_urlset(
+                root, source_id, max_age_days, max_urls, url_pattern
+            )
+        else:
+            logger.warning("sitemap_unknown_format url=%s root_tag=%s", sitemap_url, root.tag)
+            return []
+
+    def _parse_sitemap_index(
+        self,
+        root: ET.Element,
+        source_id: str,
+        base_url: str,
+        max_age_days: int,
+        max_urls: int,
+        url_pattern: str | None,
+    ) -> list[DiscoveredURL]:
+        """Parse a sitemap index file and recursively parse child sitemaps.
+
+        Args:
+            root: XML root element of the sitemap index.
+            source_id: Site identifier.
+            base_url: Base URL for resolving.
+            max_age_days: Freshness filter.
+            max_urls: Maximum total URLs.
+            url_pattern: Optional URL filter pattern.
+
+        Returns:
+            Aggregated list of DiscoveredURL objects from all child sitemaps.
+        """
+        results: list[DiscoveredURL] = []
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+
+        child_sitemaps: list[tuple[str, datetime | None]] = []
+
+        for sitemap_el in root.iter():
+            if sitemap_el.tag.endswith("sitemap"):
+                loc_el = None
+                lastmod_el = None
+                for child in sitemap_el:
+                    if child.tag.endswith("loc"):
+                        loc_el = child
+                    elif child.tag.endswith("lastmod"):
+                        lastmod_el = child
+
+                if loc_el is not None and loc_el.text:
+                    child_url = loc_el.text.strip()
+                    lastmod_dt = None
+                    if lastmod_el is not None and lastmod_el.text:
+                        lastmod_dt = _parse_datetime_string(lastmod_el.text.strip())
+
+                    # Skip child sitemaps that are too old
+                    if lastmod_dt and lastmod_dt < cutoff:
+                        continue
+
+                    child_sitemaps.append((child_url, lastmod_dt))
+
+        logger.info(
+            "sitemap_index_parsed source_id=%s child_sitemaps=%s",
+            source_id, len(child_sitemaps),
+        )
+
+        # Parse each child sitemap (most recent first)
+        child_sitemaps.sort(key=lambda x: x[1] or datetime.min.replace(tzinfo=timezone.utc), reverse=True)
+
+        for child_url, _ in child_sitemaps:
+            if len(results) >= max_urls:
+                break
+            remaining = max_urls - len(results)
+            child_results = self.parse_sitemap(
+                child_url, source_id, base_url=base_url,
+                max_age_days=max_age_days, max_urls=remaining,
+                url_pattern=url_pattern,
+            )
+            results.extend(child_results)
+
+        return results
+
+    def _parse_urlset(
+        self,
+        root: ET.Element,
+        source_id: str,
+        max_age_days: int,
+        max_urls: int,
+        url_pattern: str | None,
+    ) -> list[DiscoveredURL]:
+        """Parse a standard sitemap <urlset> element.
+
+        Args:
+            root: XML root element.
+            source_id: Site identifier.
+            max_age_days: Freshness filter.
+            max_urls: Maximum URLs to collect.
+            url_pattern: Optional regex URL filter.
+
+        Returns:
+            List of DiscoveredURL objects.
+        """
+        results: list[DiscoveredURL] = []
+        cutoff = datetime.now(timezone.utc) - timedelta(days=max_age_days)
+        compiled_pattern = re.compile(url_pattern) if url_pattern else None
+
+        for url_el in root.iter():
+            if not url_el.tag.endswith("url"):
+                continue
+            if len(results) >= max_urls:
+                break
+
+            loc_el = None
+            lastmod_el = None
+            news_pub_el = None
+
+            for child in url_el:
+                tag = child.tag.split("}")[-1] if "}" in child.tag else child.tag
+                if tag == "loc":
+                    loc_el = child
+                elif tag == "lastmod":
+                    lastmod_el = child
+                elif tag == "publication_date":
+                    news_pub_el = child
+
+            if loc_el is None or not loc_el.text:
+                continue
+
+            url = normalize_url(loc_el.text.strip())
+            if not url or not is_article_url(url):
+                continue
+
+            # Apply URL pattern filter
+            if compiled_pattern and not compiled_pattern.search(url):
+                continue
+
+            # Extract date (lastmod or news:publication_date)
+            pub_date: datetime | None = None
+            if news_pub_el is not None and news_pub_el.text:
+                pub_date = _parse_datetime_string(news_pub_el.text.strip())
+            elif lastmod_el is not None and lastmod_el.text:
+                pub_date = _parse_datetime_string(lastmod_el.text.strip())
+
+            # Freshness filter
+            if pub_date and pub_date < cutoff:
+                continue
+
+            results.append(DiscoveredURL(
+                url=url,
+                source_id=source_id,
+                discovered_via="sitemap",
+                published_at=pub_date,
+                priority=1,
+            ))
+
+        logger.info(
+            "sitemap_urlset_parsed source_id=%s articles_found=%s",
+            source_id, len(results),
+        )
+        return results
+
+
+# ---------------------------------------------------------------------------
+# Tier 2: DOM Navigation (BeautifulSoup)
+# ---------------------------------------------------------------------------
+
+class DOMNavigator:
+    """Extract article URLs from HTML listing pages using CSS selectors.
+
+    Navigates section/category pages and extracts article links using
+    configurable CSS selectors from sources.yaml.
+
+    Args:
+        network_guard: NetworkGuard instance for fetching pages.
+    """
+
+    def __init__(self, network_guard: NetworkGuard) -> None:
+        self._guard = network_guard
+
+    def discover_from_page(
+        self,
+        page_url: str,
+        source_id: str,
+        article_link_selector: str = "a[href]",
+        base_url: str = "",
+        max_urls: int = 500,
+    ) -> list[DiscoveredURL]:
+        """Extract article URLs from a listing page.
+
+        Args:
+            page_url: URL of the listing/section page.
+            source_id: Site identifier for rate limiting.
+            article_link_selector: CSS selector for article links.
+            base_url: Base URL for resolving relative links.
+            max_urls: Maximum URLs to extract.
+
+        Returns:
+            List of DiscoveredURL objects.
+
+        Raises:
+            ParseError: If the page HTML cannot be parsed.
+        """
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            logger.error("beautifulsoup4_not_available source_id=%s", source_id)
+            return []
+
+        try:
+            response = self._guard.fetch(page_url, site_id=source_id)
+        except NetworkError as e:
+            logger.error("dom_fetch_failed url=%s source_id=%s error=%s", page_url, source_id, str(e))
+            return []
+
+        effective_base = base_url or str(urlparse(page_url)._replace(path="/", query="", fragment="").geturl())
+
+        try:
+            soup = BeautifulSoup(response.text, "html.parser")
+        except Exception as e:
+            raise ParseError(f"Failed to parse HTML from {page_url}: {e}", url=page_url)
+
+        results: list[DiscoveredURL] = []
+        seen: set[str] = set()
+
+        links = soup.select(article_link_selector)
+
+        for link in links:
+            href = link.get("href", "")
+            if not href or isinstance(href, list):
+                continue
+            if isinstance(href, list):
+                href = href[0]
+
+            url = normalize_url(str(href), base_url=effective_base)
+            if not url or url in seen:
+                continue
+            if not is_article_url(url):
+                continue
+
+            seen.add(url)
+            results.append(DiscoveredURL(
+                url=url,
+                source_id=source_id,
+                discovered_via="dom",
+                priority=2,
+            ))
+
+            if len(results) >= max_urls:
+                break
+
+        logger.info(
+            "dom_links_extracted url=%s source_id=%s total_links=%s article_links=%s",
+            page_url, source_id, len(links), len(results),
+        )
+        return results
+
+    def discover_from_sections(
+        self,
+        sections: list[str],
+        source_id: str,
+        base_url: str,
+        article_link_selector: str = "a[href]",
+        max_urls_per_section: int = 100,
+    ) -> list[DiscoveredURL]:
+        """Discover article URLs across multiple section pages.
+
+        Args:
+            sections: List of section paths (e.g., ["/politics", "/economy"]).
+            source_id: Site identifier.
+            base_url: Base URL for constructing full section URLs.
+            article_link_selector: CSS selector for article links.
+            max_urls_per_section: Maximum URLs per section page.
+
+        Returns:
+            Deduplicated list of DiscoveredURL objects.
+        """
+        all_results: list[DiscoveredURL] = []
+        seen_urls: set[str] = set()
+
+        for section in sections:
+            section_url = urljoin(base_url, section)
+            results = self.discover_from_page(
+                section_url,
+                source_id=source_id,
+                article_link_selector=article_link_selector,
+                base_url=base_url,
+                max_urls=max_urls_per_section,
+            )
+
+            for result in results:
+                if result.url not in seen_urls:
+                    seen_urls.add(result.url)
+                    all_results.append(result)
+
+        return all_results
+
+
+# ---------------------------------------------------------------------------
+# URL Discovery Pipeline
+# ---------------------------------------------------------------------------
+
+class URLDiscovery:
+    """Orchestrates the 3-tier URL discovery pipeline.
+
+    Runs Tier 1 (RSS/Sitemap) -> Tier 2 (DOM) -> Tier 3 (Playwright) with
+    deduplication at each stage. Lower tiers are only attempted if the minimum
+    URL threshold is not met.
+
+    Args:
+        network_guard: NetworkGuard instance for HTTP requests.
+        min_urls_threshold: Minimum URLs to discover before stopping.
+            If a tier produces fewer than this, the next tier is attempted.
+    """
+
+    def __init__(
+        self,
+        network_guard: NetworkGuard,
+        min_urls_threshold: int = 5,
+    ) -> None:
+        self._guard = network_guard
+        self._min_threshold = min_urls_threshold
+        self._rss_parser = RSSParser(network_guard)
+        self._sitemap_parser = SitemapParser(network_guard)
+        self._dom_navigator = DOMNavigator(network_guard)
+
+    def discover(
+        self,
+        site_config: dict[str, Any],
+        source_id: str,
+        max_age_days: int = 1,
+    ) -> list[DiscoveredURL]:
+        """Run the full URL discovery pipeline for a site.
+
+        Executes tiers in order based on the site's configured primary method
+        and fallback methods. Deduplicates at each stage.
+
+        Args:
+            site_config: Site configuration from sources.yaml.
+            source_id: Site identifier.
+            max_age_days: Only include articles published within this many days.
+
+        Returns:
+            Deduplicated list of DiscoveredURL objects.
+        """
+        crawl_config = site_config.get("crawl", {})
+        primary_method = crawl_config.get("primary_method", "rss")
+        fallback_methods = crawl_config.get("fallback_methods", [])
+        base_url = site_config.get("url", "")
+
+        # Build ordered method list
+        methods = [primary_method] + [m for m in fallback_methods if m != primary_method]
+
+        all_urls: list[DiscoveredURL] = []
+        seen: set[str] = set()
+
+        for method in methods:
+            discovered = self._discover_by_method(
+                method, site_config, source_id, base_url, max_age_days
+            )
+
+            # Deduplicate
+            new_urls: list[DiscoveredURL] = []
+            for url_obj in discovered:
+                if url_obj.url not in seen:
+                    seen.add(url_obj.url)
+                    new_urls.append(url_obj)
+                    all_urls.append(url_obj)
+
+            logger.info(
+                "discovery_tier_complete source_id=%s method=%s new_urls=%s total_urls=%s",
+                source_id, method, len(new_urls), len(all_urls),
+            )
+
+            # If we have enough URLs, stop
+            if len(all_urls) >= self._min_threshold:
+                break
+
+        logger.info(
+            "discovery_complete source_id=%s total_urls=%s methods_tried=%s",
+            source_id, len(all_urls), len(methods),
+        )
+
+        return all_urls
+
+    def _discover_by_method(
+        self,
+        method: str,
+        site_config: dict[str, Any],
+        source_id: str,
+        base_url: str,
+        max_age_days: int,
+    ) -> list[DiscoveredURL]:
+        """Dispatch to the appropriate discovery method.
+
+        Args:
+            method: Discovery method name ("rss", "sitemap", "dom", "playwright", "api").
+            site_config: Site configuration.
+            source_id: Site identifier.
+            base_url: Site base URL.
+            max_age_days: Freshness filter.
+
+        Returns:
+            List of DiscoveredURL objects from this method.
+        """
+        crawl_config = site_config.get("crawl", {})
+
+        if method == "rss":
+            rss_url = crawl_config.get("rss_url", "")
+            if not rss_url:
+                return []
+            if not rss_url.startswith(("http://", "https://")):
+                rss_url = urljoin(base_url, rss_url)
+            try:
+                return self._rss_parser.parse_feed(rss_url, source_id, max_age_days)
+            except (NetworkError, ParseError) as e:
+                logger.warning("rss_discovery_failed source_id=%s error=%s", source_id, str(e))
+                return []
+
+        elif method == "sitemap":
+            sitemap_url = crawl_config.get("sitemap_url", "/sitemap.xml")
+            try:
+                return self._sitemap_parser.parse_sitemap(
+                    sitemap_url, source_id, base_url=base_url,
+                    max_age_days=max_age_days,
+                )
+            except (NetworkError, ParseError) as e:
+                logger.warning("sitemap_discovery_failed source_id=%s error=%s", source_id, str(e))
+                return []
+
+        elif method == "dom":
+            # DOM navigation uses sections from config or just the base URL
+            sections = crawl_config.get("sections", ["/"])
+            article_link_selector = crawl_config.get("article_link_css", "a[href]")
+            try:
+                return self._dom_navigator.discover_from_sections(
+                    sections, source_id, base_url,
+                    article_link_selector=article_link_selector,
+                )
+            except (NetworkError, ParseError) as e:
+                logger.warning("dom_discovery_failed source_id=%s error=%s", source_id, str(e))
+                return []
+
+        elif method == "api":
+            # API method is treated as RSS (many API feeds are RSS-compatible)
+            rss_url = crawl_config.get("rss_url", "")
+            if not rss_url:
+                return []
+            if not rss_url.startswith(("http://", "https://")):
+                rss_url = urljoin(base_url, rss_url)
+            try:
+                return self._rss_parser.parse_feed(rss_url, source_id, max_age_days)
+            except (NetworkError, ParseError) as e:
+                logger.warning("api_discovery_failed source_id=%s error=%s", source_id, str(e))
+                return []
+
+        elif method == "playwright":
+            # Playwright discovery is a placeholder -- requires @anti-block-dev integration
+            logger.info(
+                "playwright_discovery_skipped source_id=%s reason=%s",
+                source_id, "Playwright integration not yet available (Step 10 anti-block-dev task)",
+            )
+            return []
+
+        else:
+            logger.warning("unknown_discovery_method method=%s source_id=%s", method, source_id)
+            return []
+
+
+# ---------------------------------------------------------------------------
+# Date parsing utilities
+# ---------------------------------------------------------------------------
+
+# Common datetime patterns found in RSS feeds, sitemaps, and articles
+_DATE_PATTERNS = [
+    # ISO 8601 variants
+    (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}[+-]\d{2}:\d{2}", "%Y-%m-%dT%H:%M:%S%z"),
+    (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z", "%Y-%m-%dT%H:%M:%SZ"),
+    (r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "%Y-%m-%dT%H:%M:%S"),
+    (r"\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}", "%Y-%m-%d %H:%M:%S"),
+    (r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d"),
+]
+
+_COMPILED_DATE_PATTERNS = [(re.compile(p), fmt) for p, fmt in _DATE_PATTERNS]
+
+
+def _parse_datetime_string(date_str: str) -> datetime | None:
+    """Parse a datetime string from various common formats.
+
+    Normalizes to UTC. If no timezone info is present, assumes UTC.
+
+    Args:
+        date_str: Date string to parse.
+
+    Returns:
+        datetime in UTC, or None if parsing fails.
+    """
+    if not date_str or not date_str.strip():
+        return None
+
+    date_str = date_str.strip()
+
+    # Try Python's built-in fromisoformat first (handles most ISO 8601)
+    try:
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        pass
+
+    # Try compiled patterns
+    for pattern, fmt in _COMPILED_DATE_PATTERNS:
+        match = pattern.search(date_str)
+        if match:
+            try:
+                dt = datetime.strptime(match.group(), fmt)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.astimezone(timezone.utc)
+            except (ValueError, TypeError):
+                continue
+
+    # RFC 2822 format (common in RSS)
+    try:
+        from email.utils import parsedate_to_datetime
+        dt = parsedate_to_datetime(date_str)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        return dt.astimezone(timezone.utc)
+    except (ValueError, TypeError, IndexError):
+        pass
+
+    return None

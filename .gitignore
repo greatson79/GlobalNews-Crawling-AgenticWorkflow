@@ -15,8 +15,59 @@ diagnosis-logs/
 translations/*
 !translations/glossary.yaml
 
+# Translation chunking temp directory
+.tmp/
+
 # TDD Guard toggle — personal workflow setting (not shared)
 .tdd-guard
 
 # Setup Hook logs — runtime diagnostics (regenerated on each run)
 .claude/hooks/*.log
+
+# =============================================================================
+# GlobalNews Crawling & Analysis System
+# =============================================================================
+
+# Python
+*.pyc
+*.pyo
+*.egg-info/
+.venv/
+venv/
+dist/
+build/
+*.egg
+
+# Data directories (large files, generated at runtime)
+data/raw/
+data/processed/
+data/features/
+data/analysis/
+data/output/
+data/models/
+data/logs/
+
+# Keep config files tracked
+!data/config/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.production
+
+# OS
+Thumbs.db
+
+# Jupyter
+.ipynb_checkpoints/
+
+# pytest
+.pytest_cache/
+htmlcov/
+.coverage

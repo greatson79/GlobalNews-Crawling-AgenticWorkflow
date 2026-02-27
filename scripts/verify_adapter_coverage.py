@@ -49,13 +49,16 @@ _REGISTRY_RE = re.compile(
 )
 
 
-def _load_sources_yaml(path: Path) -> list[str]:
-    """Load source domains from sources.yaml.
+def _load_sources_yaml(path: Path) -> dict[str, str]:
+    """Load source site_ids and domains from sources.yaml.
 
-    Returns a list of domain strings.
+    Returns a dict of site_id -> domain string.
+    Supports two formats:
+      - dict-of-dicts: {sources: {site_id: {url: ...}}}
+      - list-of-dicts: {sources: [{domain: ..., ...}]}
     """
     if not path.is_file():
-        return []
+        return {}
 
     text = path.read_text(encoding="utf-8")
 
@@ -64,37 +67,56 @@ def _load_sources_yaml(path: Path) -> list[str]:
             doc = yaml.safe_load(text)
             if isinstance(doc, dict) and "sources" in doc:
                 sources = doc["sources"]
+                # Dict-of-dicts format: {site_id: {url: "https://..."}}
+                if isinstance(sources, dict):
+                    result = {}
+                    for site_id, cfg in sources.items():
+                        if isinstance(cfg, dict):
+                            url = cfg.get("url", "")
+                            if url:
+                                from urllib.parse import urlparse
+                                domain = urlparse(url).netloc.lower()
+                                domain = domain.removeprefix("www.")
+                                result[site_id] = domain
+                    return result
+                # List-of-dicts format: [{domain: ...}]
                 if isinstance(sources, list):
-                    domains = []
+                    result = {}
                     for entry in sources:
                         if isinstance(entry, dict) and "domain" in entry:
-                            domains.append(entry["domain"].strip().lower())
-                    return domains
+                            d = entry["domain"].strip().lower()
+                            sid = entry.get("id", d.split(".")[0])
+                            result[sid] = d
+                    return result
         except yaml.YAMLError:
             pass
 
     # Fallback: regex extraction
-    domains: list[str] = []
-    for match in re.finditer(r"domain:\s*(\S+)", text):
-        domain = match.group(1).strip().strip("'\"").lower()
-        if "." in domain:
-            domains.append(domain)
+    result: dict[str, str] = {}
+    for match in re.finditer(r"url:\s*(\S+)", text):
+        url = match.group(1).strip().strip("'\"")
+        if "://" in url:
+            from urllib.parse import urlparse
+            domain = urlparse(url).netloc.lower().removeprefix("www.")
+            sid = domain.split(".")[0]
+            result[sid] = domain
 
-    return domains
+    return result
 
 
 def _scan_adapter_files(adapters_dir: Path) -> dict[str, dict[str, Any]]:
-    """Scan adapter directory for .py files and extract domain mappings.
+    """Scan adapter directory (including subdirs) for .py files and extract domain/site_id mappings.
 
-    Returns a dict of adapter_file -> {classes, domains}.
+    Returns a dict of relative_path -> {classes, domains, site_ids}.
     """
     adapters: dict[str, dict[str, Any]] = {}
 
     if not adapters_dir.is_dir():
         return adapters
 
-    for py_file in sorted(adapters_dir.glob("*.py")):
-        if py_file.name == "__init__.py":
+    # Scan all .py files in adapters/ and subdirectories
+    for py_file in sorted(adapters_dir.rglob("*.py")):
+        if py_file.name.startswith("__") or py_file.name.startswith("_"):
             continue
 
         text = py_file.read_text(encoding="utf-8")
@@ -109,13 +131,18 @@ def _scan_adapter_files(adapters_dir: Path) -> dict[str, dict[str, Any]]:
             if "." in d and len(d) > 3:
                 domains.append(d)
 
-        # Also check for domain in filename (e.g., chosun_adapter.py -> chosun.com)
-        stem = py_file.stem.replace("_adapter", "").replace("_", ".")
+        # Extract SITE_ID from class attributes
+        site_ids = []
+        for m in re.finditer(r'SITE_ID\s*[:=]\s*["\'](\w+)["\']', text):
+            site_ids.append(m.group(1).lower())
 
-        adapters[py_file.name] = {
+        rel_path = str(py_file.relative_to(adapters_dir))
+
+        adapters[rel_path] = {
             "classes": classes,
             "domains": list(set(domains)),
-            "stem": stem,
+            "site_ids": site_ids,
+            "stem": py_file.stem,
         }
 
     return adapters
@@ -148,7 +175,10 @@ def verify_coverage(project_dir: Path) -> dict:
 
     Returns a dict with coverage analysis.
     """
-    sources_path = project_dir / "config" / "sources.yaml"
+    # Try data/config/sources.yaml first, fallback to config/sources.yaml
+    sources_path = project_dir / "data" / "config" / "sources.yaml"
+    if not sources_path.is_file():
+        sources_path = project_dir / "config" / "sources.yaml"
     adapters_dir = project_dir / "src" / "crawling" / "adapters"
     init_path = adapters_dir / "__init__.py"
 
@@ -156,79 +186,89 @@ def verify_coverage(project_dir: Path) -> dict:
     errors: list[str] = []
 
     # ------------------------------------------------------------------
-    # Load expected domains from sources.yaml
+    # Load expected site_ids and domains from sources.yaml
     # ------------------------------------------------------------------
-    expected_domains = _load_sources_yaml(sources_path)
-    if not expected_domains:
-        errors.append(f"No domains found in {sources_path}")
+    site_id_to_domain = _load_sources_yaml(sources_path)
+    if not site_id_to_domain:
+        errors.append(f"No sites found in {sources_path}")
 
-    expected_set = set(expected_domains)
+    expected_site_ids = set(site_id_to_domain.keys())
+    expected_domains = set(site_id_to_domain.values())
 
     # ------------------------------------------------------------------
-    # Scan adapter files
+    # Scan adapter files (including subdirectories)
     # ------------------------------------------------------------------
     adapter_files = _scan_adapter_files(adapters_dir)
     if not adapter_files and adapters_dir.is_dir():
-        warnings.append("No adapter .py files found (excluding __init__.py)")
+        warnings.append("No adapter .py files found")
     elif not adapters_dir.is_dir():
         warnings.append(f"Adapters directory not found: {adapters_dir}")
 
-    # Collect all domains covered by adapter files
-    covered_by_files: set[str] = set()
+    # Collect all site_ids and domains covered by adapter files
+    covered_site_ids: set[str] = set()
+    covered_domains: set[str] = set()
     for info in adapter_files.values():
-        covered_by_files.update(info["domains"])
+        covered_site_ids.update(info.get("site_ids", []))
+        covered_domains.update(info["domains"])
 
     # ------------------------------------------------------------------
-    # Parse registry
+    # Parse registry from __init__.py files (top-level + subdirectories)
     # ------------------------------------------------------------------
     registry = _parse_registry(init_path)
-    if not registry and init_path.is_file():
-        warnings.append("__init__.py exists but no domain mappings found")
-    elif not init_path.is_file():
-        warnings.append(f"Registry __init__.py not found: {init_path}")
+    # Also parse subdirectory registries
+    for subdir in adapters_dir.iterdir():
+        if subdir.is_dir() and not subdir.name.startswith("_"):
+            sub_init = subdir / "__init__.py"
+            if sub_init.is_file():
+                sub_reg = _parse_registry(sub_init)
+                registry.update(sub_reg)
 
     registered_domains = set(registry.keys())
 
     # ------------------------------------------------------------------
-    # Compute coverage
+    # Compute coverage (by site_id — primary matching)
     # ------------------------------------------------------------------
-    # A domain is "covered" if it appears in either adapter files or registry
-    all_covered = covered_by_files | registered_domains
+    covered_ids = expected_site_ids & covered_site_ids
+    missing_ids = expected_site_ids - covered_site_ids
 
-    covered = expected_set & all_covered
-    missing = expected_set - all_covered
-    extra = all_covered - expected_set
+    # Also check by domain (secondary matching for sites matched by domain in file)
+    for sid in list(missing_ids):
+        domain = site_id_to_domain.get(sid, "")
+        if domain in covered_domains or domain in registered_domains:
+            covered_ids.add(sid)
+            missing_ids.discard(sid)
 
-    # Domains in files but not in registry
-    file_only = covered_by_files - registered_domains
-    # Domains in registry but not in files
-    registry_only = registered_domains - covered_by_files
+    # Also match by filename stem
+    adapter_stems = {info["stem"] for info in adapter_files.values()}
+    for sid in list(missing_ids):
+        # Check various name patterns
+        if sid in adapter_stems or sid.replace("_", "") in adapter_stems:
+            covered_ids.add(sid)
+            missing_ids.discard(sid)
 
-    total_expected = len(expected_set)
-    total_covered = len(covered)
+    total_expected = len(expected_site_ids)
+    total_covered = len(covered_ids)
     coverage_pct = (total_covered / total_expected * 100) if total_expected > 0 else 0.0
 
     result = {
-        "valid": len(errors) == 0,
+        "valid": len(errors) == 0 and len(missing_ids) == 0,
         "summary": {
-            "expected_domains": total_expected,
-            "covered_domains": total_covered,
-            "missing_domains": len(missing),
-            "extra_domains": len(extra),
+            "expected_sites": total_expected,
+            "covered_sites": total_covered,
+            "missing_sites": len(missing_ids),
             "coverage_percent": round(coverage_pct, 1),
         },
-        "covered": sorted(covered),
-        "missing": sorted(missing),
-        "extra": sorted(extra),
-        "file_only_not_registered": sorted(file_only),
-        "registry_only_no_file": sorted(registry_only),
+        "covered": sorted(covered_ids),
+        "missing": sorted(missing_ids),
         "adapter_files": {
             name: {
                 "classes": info["classes"],
+                "site_ids": info.get("site_ids", []),
                 "domains": info["domains"],
             }
             for name, info in adapter_files.items()
         },
+        "adapter_count": len(adapter_files),
         "registry_entries": len(registry),
         "warnings": warnings,
         "errors": errors,

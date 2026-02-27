@@ -731,6 +731,23 @@
 - **대안**: (1) 테스트 없이 수동 검증만 — 기각 (22개 스크립트 × 반복 검증 비용). (2) E2E 테스트만 — 기각 (실패 시 원인 특정 어려움). (3) Unit만 — 기각 (cross-cutting 일관성 검증 불가)
 - **관련 파일**: `tests/` 디렉터리 (8개 파일), `pytest.ini`
 
+### ADR-054: Parquet Schema Column Names — Implementation vs PRD Divergence
+- **날짜**: 2026-02-26
+- **상태**: Accepted
+- **맥락**: Step 20 adversarial review에서 ARTICLES 및 ANALYSIS Parquet 스키마의 컬럼명이 PRD와 4곳(ARTICLES)·전면(ANALYSIS) 다름을 Critical로 지적. PRD는 `source_id`, `section`, `raw_html_hash`, `extraction_method`을 쓰지만, 구현은 `source`, `category`, `content_hash`, `word_count`를 사용. ANALYSIS의 경우 PRD는 JSON-packed emotion/entities와 stance/novelty 등 추가 컬럼을 규정하지만, 구현은 flat Plutchik 8차원 + 별도 entity 컬럼으로 구성.
+- **결정**: 기존 구현의 컬럼명을 유지하되, 듀얼 스키마 정의를 제거(stage1→parquet_writer 임포트)하여 nullability 불일치를 해소. PRD 컬럼명과의 매핑을 코드 주석과 이 ADR에 문서화.
+- **근거**: 변경 시 파급효과가 8개 분석 스테이지 + SQLite 빌더 + 44개 어댑터에 걸쳐 10+ 파일 수정 필요. 런타임 데이터 정합성 위험 대비 편익이 낮음. 내부적으로 모든 스테이지가 동일한 컬럼명을 일관되게 사용 중이므로 실질적 문제 없음. 리뷰어도 "or document as ADR"을 대안으로 명시.
+- **대안**: (1) PRD 컬럼명으로 전면 변경 — 기각 (10+ 파일 수정, 회귀 위험 과다). (2) 하이브리드 (alias mapping) — 기각 (복잡도 증가, 디버깅 난이도 상승)
+- **컬럼 매핑**: ARTICLES: PRD source_id↔impl source, PRD section↔impl category, PRD raw_html_hash↔impl content_hash, PRD extraction_method(utf8)↔impl word_count(int32). ANALYSIS: PRD uses JSON emotion/entities; impl uses flat columns.
+
+### ADR-055: MD5→SHA-256 Migration for File Integrity & SimHash
+- **날짜**: 2026-02-26
+- **상태**: Accepted
+- **맥락**: Step 20 리뷰에서 dedup.py SimHash 토큰 해싱과 parquet_writer.py 파일 무결성 검사에 MD5 사용을 Warning으로 지적 (S324).
+- **결정**: 두 곳 모두 SHA-256으로 교체. 보안 맥락은 아니지만 (collision resistance 불필요), 코드 분석 도구 경고를 제거하고 현대적 관행을 따름.
+- **근거**: SHA-256은 md5 대비 ~30% 느리지만 (μs 단위), 전체 파이프라인에서 무시 가능한 비용. bandit S324 suppression 주석 제거로 코드 청결도 향상.
+- **대안**: (1) blake2b — 기각 (SHA-256보다 빠르지만 생태계 관례에서 벗어남). (2) MD5 유지 + 주석 — 기각 (리뷰어 지적 반복 방지)
+
 ---
 
 ## 부록: 커밋 히스토리 기반 타임라인

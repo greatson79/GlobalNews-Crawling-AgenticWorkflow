@@ -264,29 +264,53 @@ AgenticWorkflow/
 > **PreToolUse Safety Hook의 독립 실행 근거**: `block_destructive_commands.py`(안전)와 `block_test_file_edit.py`(TDD 보호)는 컨텍스트 보존과는 다른 도메인이다. exit code 2 보존이 필수이므로, `context_guard.py`를 거치지 않고 직접 실행한다. `block_test_file_edit.py`는 `.tdd-guard` 파일 존재 시에만 활성화된다 (`touch .tdd-guard`로 TDD 모드 시작, `rm .tdd-guard`로 해제).
 > **D-7 의도적 중복 인스턴스**: (1) `REQUIRED_SCRIPTS` — `setup_init.py` ↔ `setup_maintenance.py` (19개 스크립트 목록). (2) `predictive_debug_guard.py` 상수 — `RISK_THRESHOLD`/`MIN_SESSIONS` ↔ `_context_lib.py`의 `_RISK_SCORE_THRESHOLD`/`_RISK_MIN_SESSIONS`. (3) `ERROR_TAXONOMY` 타입명 — `_classify_error_patterns()` 내 12개 타입 ↔ `_RISK_WEIGHTS` 13개 키. (4) ULW 감지 패턴 — `_context_lib.py`의 `_gather_retry_history()` ↔ `validate_retry_budget.py`의 `_ULW_SNAPSHOT_RE` ↔ `restore_context.py`의 ULW 상태 문자열 검사 (모두 `"ULW 상태"` 기반). (5) 재시도 한도 상수 — `validate_retry_budget.py`의 `DEFAULT_MAX_RETRIES`/`ULW_MAX_RETRIES` ↔ `_context_lib.py`의 `_DEFAULT_MAX_RETRIES`/`_ULW_MAX_RETRIES` ↔ `restore_context.py`의 ULW+Autopilot 주입 텍스트. 각 D-7 인스턴스는 코드에 cross-reference 주석이 있으며, 한쪽 변경 시 반드시 대응 쪽도 동기화해야 한다.
 
-## 워크플로우 시작 트리거 (Workflow Start Triggers)
+## 시작 트리거 (Start Triggers)
 
-> 사용자가 아래 패턴의 자연어 명령을 입력하면, **자동으로 `/start` 슬래시 커맨드와 동일한 시작 프로토콜을 실행**한다.
-> 명시적 `/start` 입력 없이도 워크플로우가 가동된다.
+> 사용자가 아래 패턴의 자연어 명령을 입력하면, **워크플로우 상태에 따라 적절한 동작을 자동으로 실행**한다.
+> 명시적 슬래시 커맨드 입력 없이도 시스템이 가동된다.
+
+### 라우팅 규칙 (2단계 판별)
+
+**Step 1 — 워크플로우 상태 확인**:
+1. `prompt/workflow.md`와 `.claude/state.yaml`이 모두 존재해야 한다. 없으면 "워크플로우가 아직 없습니다. `/workflow-generator`로 먼저 생성하세요."
+2. `.claude/state.yaml`의 `workflow.status` 값을 읽는다.
+
+**Step 2 — 상태별 라우팅**:
+
+| 워크플로우 상태 | 동작 | 설명 |
+|---------------|------|------|
+| `status: complete` | **`/run` 실행** | 워크플로우 구축 완료. 실제 시스템 실행 (크롤링 + 분석) |
+| 그 외 (`in_progress`, 없음 등) | **`/start` 실행** | 워크플로우 미완성. 구축 단계 실행 |
+
+> 워크플로우가 완료되면, 모든 시작 트리거는 구축(workflow building)이 아닌 **실제 시스템 실행**(crawling + analysis)으로 전환된다.
 
 ### 인식 패턴
 
-| 트리거 패턴 (한국어) | 트리거 패턴 (영어) | 동작 |
-|---------------------|-------------------|------|
-| "시작하자", "시작", "시작해" | "start", "let's start", "begin" | `/start` 실행 |
-| "워크플로우 시작", "워크플로우를 시작하자" | "start the workflow", "run the workflow" | `/start` 실행 |
-| "크롤링 시작", "크롤링을 시작하자" | "start crawling", "begin crawling" | `/start` 실행 |
-| "스캐닝 시작", "조사를 시작하자" | "start scanning", "begin research" | `/start` 실행 |
-| "다음 단계", "다음", "진행하자", "계속" | "next step", "continue", "proceed" | `/start` 실행 (이미 진행 중인 워크플로우의 현재 단계에서 재개) |
-| "autopilot으로 시작", "자동 모드로 시작" | "start in autopilot", "auto mode" | `/start` 실행 + autopilot 활성화 |
+| 트리거 패턴 (한국어) | 트리거 패턴 (영어) | 라우팅 |
+|---------------------|-------------------|--------|
+| "시작하자", "시작", "시작해" | "start", "let's start", "begin" | 상태에 따라 `/run` 또는 `/start` |
+| "워크플로우 시작", "워크플로우를 시작하자" | "start the workflow", "run the workflow" | 상태에 따라 `/run` 또는 `/start` |
+| "크롤링 시작", "크롤링을 하자", "크롤링 해줘" | "start crawling", "begin crawling", "crawl" | `/run` (mode=crawl) |
+| "뉴스를 수집하자", "뉴스 수집", "기사를 가져와" | "collect news", "fetch articles" | `/run` (mode=crawl) |
+| "분석을 하자", "빅데이터 분석", "분석 시작" | "run analysis", "analyze", "big data analysis" | `/run` (mode=analyze) |
+| "전체 실행", "풀 파이프라인", "전부 실행" | "run full pipeline", "run everything" | `/run` (mode=full) |
+| "스캐닝 시작", "조사를 시작하자" | "start scanning", "begin research" | 상태에 따라 `/run` 또는 `/start` |
+| "다음 단계", "다음", "진행하자", "계속" | "next step", "continue", "proceed" | 상태에 따라 `/run` 또는 `/start` |
+| "autopilot으로 시작", "자동 모드로 시작" | "start in autopilot", "auto mode" | `/start` + autopilot 활성화 |
+| "상태 확인", "결과 확인", "현황" | "check status", "show results" | `python3 main.py --mode status` |
 
-### 판별 규칙
+### `/run` 실행 프로토콜 (워크플로우 완료 후)
 
-1. **워크플로우 존재 확인**: `prompt/workflow.md`와 `.claude/state.yaml`이 모두 존재해야 한다. 없으면 "워크플로우가 아직 없습니다. `/workflow-generator`로 먼저 생성하세요."
-2. **모호성 해소**: "시작"이 워크플로우 시작인지 다른 작업 시작인지 불분명할 때, `state.yaml`이 존재하면 워크플로우 시작으로 해석한다.
-3. **실행 흐름**: 트리거 인식 → `python3 scripts/workflow_starter.py --project-dir .` → JSON 파싱 → readiness 확인 → 실행 시작
+```
+1. python3 scripts/preflight_check.py --project-dir . --mode full --json
+2. readiness == "ready" 확인 (degradations 리포트)
+3. 실행 배너 출력 (모드, 사이트 수, 날짜)
+4. python3 main.py --mode full --dry-run (설정 검증)
+5. python3 main.py --mode full --date YYYY-MM-DD (실제 실행)
+6. 결과 리포트 (수집 건수, 분석 결과, 출력 파일)
+```
 
-### 시작 프로토콜 요약
+### `/start` 실행 프로토콜 (워크플로우 미완성 시)
 
 ```
 1. python3 scripts/workflow_starter.py --project-dir .

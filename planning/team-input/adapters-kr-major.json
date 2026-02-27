@@ -1,0 +1,102 @@
+{
+  "group": "kr-major",
+  "total_sites": 24,
+  "sites": [
+    {
+      "name": "#",
+      "strategy": "Site"
+    },
+    {
+      "name": "Fallback",
+      "strategy": "Rate"
+    },
+    {
+      "name": "Bot Block",
+      "strategy": "Proxy"
+    },
+    {
+      "name": "Daily Est.",
+      "strategy": "Min"
+    },
+    {
+      "name": "1",
+      "domain": "chosun.com"
+    },
+    {
+      "name": "Sitemap→DOM",
+      "strategy": "5s"
+    },
+    {
+      "name": "MEDIUM",
+      "strategy": "KR"
+    },
+    {
+      "name": "~200",
+      "domain": "3.5"
+    },
+    {
+      "name": "2",
+      "domain": "joongang.co.kr"
+    },
+    {
+      "name": "Sitemap→DOM",
+      "strategy": "10s+j"
+    },
+    {
+      "name": "HIGH",
+      "strategy": "KR"
+    },
+    {
+      "name": "~180",
+      "domain": "6.0"
+    },
+    {
+      "name": "3",
+      "domain": "donga.com"
+    },
+    {
+      "name": "Sitemap→DOM",
+      "strategy": "5s"
+    },
+    {
+      "name": "MEDIUM",
+      "strategy": "KR"
+    },
+    {
+      "name": "~200",
+      "domain": "3.5"
+    },
+    {
+      "name": "4",
+      "domain": "hani.co.kr"
+    },
+    {
+      "name": "Sitemap→DOM",
+      "strategy": "5s"
+    },
+    {
+      "name": "MEDIUM",
+      "strategy": "KR"
+    },
+    {
+      "name": "~120",
+      "domain": "2.5"
+    },
+    {
+      "name": "5",
+      "domain": "yna.co.kr"
+    },
+    {
+      "name": "Sitemap→DOM",
+      "strategy": "5s"
+    },
+    {
+      "name": "MEDIUM",
+      "strategy": "KR"
+    },
+    {
+      "name": "~500",
+      "domain": "6.0"
+    }
+  ]
+}
