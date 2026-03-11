@@ -16,10 +16,17 @@ feedparser>=6.0.10
 trafilatura>=2.0.0                  # Article extraction, F1=0.958 (Step 2)
 newspaper4k>=0.9.4                  # Fallback article extraction
 playwright>=1.40.0                  # Browser automation for JS-rendered sites
-patchright>=1.58.0                  # CDP stealth (replaces apify-fingerprint-suite)
+patchright>=1.58.0                  # CDP stealth (Playwright fork, anti-detection)
 chardet>=5.2.0                      # Charset detection fallback
 simhash>=2.1.2                      # Content deduplication
 datasketch>=1.9.0                   # MinHash deduplication
+
+# Anti-Block / Dynamic Bypass (DynamicBypassEngine — 크롤링 절대 원칙)
+curl_cffi>=0.7.0                    # TLS fingerprint mimicry (JA3/JA4, HTTP/2)
+cloudscraper>=1.2.71                # Cloudflare JS challenge solver (no browser)
+camoufox[geoip]>=0.4.0             # Firefox anti-fingerprint browser (300+ randomizations)
+waybackpy>=3.0.0                    # Internet Archive Wayback Machine API
+httpx[http2]>=0.27.0                # Async HTTP/2 client (clean API fallback)
 
 # =============================================================================
 # NLP -- Korean Stack

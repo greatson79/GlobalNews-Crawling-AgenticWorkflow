@@ -246,23 +246,23 @@ class TestSiteIsolation:
 class TestHumanEscalation:
     """Tests for Tier 6 behavior."""
 
-    def test_is_paused_at_tier_6(self, engine: AntiBlockEngine) -> None:
-        """is_paused() should return True when site reaches Tier 6."""
+    def test_is_at_max_escalation_at_tier_6(self, engine: AntiBlockEngine) -> None:
+        """is_at_max_escalation() should return True when site reaches Tier 6."""
         profile = engine.get_profile("blocked_site")
         profile.current_tier = 6
-        assert engine.is_paused("blocked_site") is True
+        assert engine.is_at_max_escalation("blocked_site") is True
 
-    def test_is_not_paused_below_tier_6(self, engine: AntiBlockEngine) -> None:
-        """is_paused() should return False below Tier 6."""
-        assert engine.is_paused("normal_site") is False
+    def test_is_not_at_max_escalation_below_tier_6(self, engine: AntiBlockEngine) -> None:
+        """is_at_max_escalation() should return False below Tier 6."""
+        assert engine.is_at_max_escalation("normal_site") is False
 
-    def test_get_all_paused_sites(self, engine: AntiBlockEngine) -> None:
-        """get_all_paused_sites() should list all Tier 6 sites."""
+    def test_get_all_max_escalation_sites(self, engine: AntiBlockEngine) -> None:
+        """get_all_max_escalation_sites() should list all Tier 6 sites."""
         engine.get_profile("paused_1").current_tier = 6
         engine.get_profile("paused_2").current_tier = 6
         engine.get_profile("active").current_tier = 3
 
-        paused = engine.get_all_paused_sites()
+        paused = engine.get_all_max_escalation_sites()
         assert "paused_1" in paused
         assert "paused_2" in paused
         assert "active" not in paused

@@ -304,7 +304,7 @@ class Stage4Aggregator:
 
         # ---- Write Parquet outputs ----
         self._write_topics_parquet(
-            _output_dir, article_ids, output
+            _output_dir, article_ids, output, articles_table
         )
         self._write_networks_parquet(_output_dir, output.communities)
         self._write_dtm_parquet(_output_dir, output.dtm)
@@ -1742,6 +1742,7 @@ class Stage4Aggregator:
         output_dir: Path,
         article_ids: list[str],
         results: Stage4Output,
+        articles_table: pa.Table | None = None,
     ) -> None:
         """Write topics.parquet matching the exact schema from Step 7 design.
 
@@ -1753,11 +1754,14 @@ class Stage4Aggregator:
             hdbscan_cluster_id int32  Independent HDBSCAN cluster ID
             nmf_topic_id    int32    NMF auxiliary topic ID
             lda_topic_id    int32    LDA auxiliary topic ID
+            published_at    timestamp[us, tz=UTC]  Publication timestamp (for Stage 7 data_span)
+            source          utf8     Source domain (for Stage 7 source_count)
 
         Args:
             output_dir: Directory to write topics.parquet.
             article_ids: Ordered article IDs.
             results: Complete Stage4Output.
+            articles_table: Original articles table (for published_at/source propagation).
         """
         n = len(article_ids)
 
@@ -1796,6 +1800,29 @@ class Stage4Aggregator:
             else np.full(n, -1, dtype=np.int32)
         )
 
+        # Extract published_at and source from articles_table for Stage 7
+        published_at_list: list = [None] * n
+        source_list: list = [""] * n
+        if articles_table is not None:
+            # Build article_id → index lookup for alignment
+            if "article_id" in articles_table.column_names:
+                at_ids = articles_table.column("article_id").to_pylist()
+                at_id_to_idx = {aid: i for i, aid in enumerate(at_ids)}
+
+                if "published_at" in articles_table.column_names:
+                    pub_col = articles_table.column("published_at").to_pylist()
+                    for j, aid in enumerate(article_ids):
+                        idx = at_id_to_idx.get(aid)
+                        if idx is not None and idx < len(pub_col):
+                            published_at_list[j] = pub_col[idx]
+
+                if "source" in articles_table.column_names:
+                    src_col = articles_table.column("source").to_pylist()
+                    for j, aid in enumerate(article_ids):
+                        idx = at_id_to_idx.get(aid)
+                        if idx is not None and idx < len(src_col):
+                            source_list[j] = src_col[idx] or ""
+
         schema = pa.schema([
             pa.field("article_id", pa.utf8()),
             pa.field("topic_id", pa.int32()),
@@ -1804,6 +1831,8 @@ class Stage4Aggregator:
             pa.field("hdbscan_cluster_id", pa.int32()),
             pa.field("nmf_topic_id", pa.int32()),
             pa.field("lda_topic_id", pa.int32()),
+            pa.field("published_at", pa.timestamp("us", tz="UTC"), nullable=True),
+            pa.field("source", pa.utf8(), nullable=True),
         ])
 
         table = pa.table(
@@ -1815,6 +1844,8 @@ class Stage4Aggregator:
                 "hdbscan_cluster_id": hdbscan_ids.tolist(),
                 "nmf_topic_id": nmf_ids.tolist(),
                 "lda_topic_id": lda_ids.tolist(),
+                "published_at": published_at_list,
+                "source": source_list,
             },
             schema=schema,
         )
@@ -2030,6 +2061,16 @@ class Stage4Aggregator:
         n = len(article_ids)
 
         # topics.parquet -- all articles mapped to topic -1
+        # Extract published_at and source from articles_table for schema alignment
+        published_at_list: list = [None] * n
+        source_list: list = [""] * n
+        if "published_at" in articles_table.column_names:
+            pub_col = articles_table.column("published_at").to_pylist()
+            published_at_list = pub_col[:n]
+        if "source" in articles_table.column_names:
+            src_col = articles_table.column("source").to_pylist()
+            source_list = [(s or "") for s in src_col[:n]]
+
         topics_schema = pa.schema([
             pa.field("article_id", pa.utf8()),
             pa.field("topic_id", pa.int32()),
@@ -2038,6 +2079,8 @@ class Stage4Aggregator:
             pa.field("hdbscan_cluster_id", pa.int32()),
             pa.field("nmf_topic_id", pa.int32()),
             pa.field("lda_topic_id", pa.int32()),
+            pa.field("published_at", pa.timestamp("us", tz="UTC"), nullable=True),
+            pa.field("source", pa.utf8(), nullable=True),
         ])
         topics_table = pa.table(
             {
@@ -2048,6 +2091,8 @@ class Stage4Aggregator:
                 "hdbscan_cluster_id": [-1] * n,
                 "nmf_topic_id": [-1] * n,
                 "lda_topic_id": [-1] * n,
+                "published_at": published_at_list,
+                "source": source_list,
             },
             schema=topics_schema,
         )

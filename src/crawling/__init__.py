@@ -1,6 +1,6 @@
 """Crawling Layer: URL discovery, content extraction, anti-block, deduplication.
 
-Handles parallel crawling of 44 news sites across 7 groups (A-G)
+Handles parallel crawling of 121 news sites across 10 groups (A-J)
 using RSS, Sitemap, API, Playwright, and DOM strategies.
 
 Modules:

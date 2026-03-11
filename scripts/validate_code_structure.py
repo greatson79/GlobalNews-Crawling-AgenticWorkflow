@@ -201,9 +201,9 @@ def validate_structure(project_dir, step_num, check_adapters=False):
     if check_adapters:
         adapter_result = _check_adapters(project_dir)
         result["adapters"] = adapter_result
-        if adapter_result["total_sites"] < 44:
+        if adapter_result["total_sites"] < 121:
             result["warnings"].append(
-                f"CS5: Only {adapter_result['total_sites']} site adapters registered (expected 44)"
+                f"CS5: Only {adapter_result['total_sites']} site adapters registered (expected 121)"
             )
 
     return result

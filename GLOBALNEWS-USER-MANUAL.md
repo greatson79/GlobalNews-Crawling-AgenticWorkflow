@@ -23,7 +23,7 @@
 | Python | 3.10 이상 | `python3 --version` |
 | 디스크 공간 | 20GB+ 여유 | 크롤링 데이터 + NLP 모델 저장 |
 | RAM | 16GB 이상 (권장 48GB) | `sysctl hw.memsize` |
-| 네트워크 | 인터넷 연결 필수 | 44개 해외 뉴스 사이트 접근 |
+| 네트워크 | 인터넷 연결 필수 | 121개 해외 뉴스 사이트 접근 |
 
 ### 1.2 설치 절차
 
@@ -61,7 +61,7 @@ python3 scripts/preflight_check.py --project-dir . --mode full --json
 
 점검 항목:
 - Python 버전 호환성
-- 핵심 의존성 설치 상태 (44개 패키지)
+- 핵심 의존성 설치 상태 (44+ 패키지)
 - 설정 파일 유효성 (`sources.yaml`, `pipeline.yaml`)
 - 디스크 공간 충분 여부
 - 데이터 디렉터리 구조
@@ -73,7 +73,7 @@ python3 scripts/preflight_check.py --project-dir . --mode full --json
   "readiness": "ready",
   "critical_failures": [],
   "degradations": ["patchright missing -- Extreme difficulty sites will be skipped"],
-  "enabled_sites": 44,
+  "enabled_sites": 121,
   "disk_free_gb": 128.5
 }
 ```
@@ -84,7 +84,7 @@ python3 scripts/preflight_check.py --project-dir . --mode full --json
 | `readiness: "blocked"` | 필수 항목 실패 | `critical_failures` 확인 후 수정 |
 | `degradations` 존재 | 일부 기능 제한 | 대부분의 사이트는 정상 작동 |
 
-> **patchright 미설치**: Extreme 난이도 사이트 5곳(FT, NYTimes, WSJ, Bloomberg, Le Monde)의 하드 페이월 바이패스가 불가능하여 title-only로 수집될 뿐, 나머지 39개 사이트는 RSS/Sitemap으로 정상 크롤링된다. Playwright만 설치해도 기본 브라우저 렌더링은 동작하지만, Patchright의 C++ 수준 봇 탐지 우회 기능은 사용할 수 없다.
+> **patchright 미설치**: Extreme 난이도 사이트 5곳(FT, NYTimes, WSJ, Bloomberg, Le Monde)의 하드 페이월 바이패스가 불가능하여 title-only로 수집될 뿐, 나머지 116개 사이트는 RSS/Sitemap으로 정상 크롤링된다. Playwright만 설치해도 기본 브라우저 렌더링은 동작하지만, Patchright의 C++ 수준 봇 탐지 우회 기능은 사용할 수 없다.
 
 ---
 
@@ -149,17 +149,20 @@ python3 main.py --mode status
 
 ### 2.5 사이트 그룹
 
-44개 사이트는 7개 그룹으로 분류된다:
+121개 사이트는 10개 그룹으로 분류된다:
 
 | 그룹 | 카테고리 | 사이트 수 | 예시 |
 |------|---------|----------|------|
-| A | 한국 주요 종합 | 5 | 조선, 동아, 한겨레, 경향, 연합뉴스 |
-| B | 한국 경제/방송 | 6 | 매경, 한경, KBS, MBC, SBS, MBN |
-| C | 한국 기술/과학 | 8 | ZDNet Korea, 전자신문, 블로터 등 |
-| D | 영미 주요 | 6 | NYT, BBC, Guardian, Reuters, AP, Washington Post |
-| E | 영미 기술/경제 | 6 | TechCrunch, Wired, Bloomberg, FT, The Verge, Ars Technica |
-| F | 아시아 태평양 | 7 | NHK, Yomiuri, SCMP, Straits Times, The Hindu 등 |
-| G | 유럽/중동 | 6 | Le Monde, Der Spiegel, El Pais, Al Jazeera 등 |
+| A | 한국 주요 일간지 | 5 | 조선, 중앙, 동아, 한겨레, 연합 |
+| B | 한국 경제지 | 4 | 매경, 한경, 파이낸셜, 머니투데이 |
+| C | 한국 니치 | 3 | 노컷, 국민, 오마이 |
+| D | 한국 IT/과학 | 10 | 38North, Bloter, 전자, ZDNet, Insight, Stratechery 등 |
+| E | 영어권 | 22 | NYT, FT, WSJ, CNN, Bloomberg, BBC, Guardian, Wired 등 |
+| F | 아시아-태평양 | 23 | SCMP, Yomiuri, Mainichi, TheHindu, Inquirer, VNExpress 등 |
+| G | 유럽/중동 | 38 | Spiegel, LeMonde, Corriere, ElPais, AlJazeera, Haaretz 등 |
+| H | 아프리카 | 4 | AllAfrica, Africanews, TheAfricaReport, Panapress |
+| I | 라틴 아메리카 | 8 | Clarin, Folha, ElMercurio, BioBioChile, ElTiempo 등 |
+| J | 러시아/중앙아시아 | 4 | RIA, RG, RBC, GoGo Mongolia |
 
 ---
 
@@ -626,7 +629,7 @@ scripts/archive_old_data.sh --dry-run
 ```yaml
 # config/sources.yaml 에 추가
 new_site:
-  group: D                         # A-G 중 적절한 그룹
+  group: E                         # A-J 중 적절한 그룹
   meta:
     name: "New Site"
     url: "https://new-site.com"
@@ -701,6 +704,10 @@ python3 main.py --mode crawl --sites new_site --log-level DEBUG
 | `Retry budget exhausted` | 품질 게이트 재시도 10/15회 소진 | 산출물 품질 근본 원인 분석 후 수동 재작업. ULW 활성 시 15회, 비활성 시 10회 |
 | `Circuit breaker OPEN` | 3회 연속 ≤5점 개선 | 동일 접근법 반복 중단. 다른 전략으로 전환하거나 사용자 개입 |
 | `Autopilot stall detected` | 동일 단계 20 cycles 경과 | 워크플로우 진행이 멈춘 상태. 품질 게이트 실패 원인 확인 후 수동 개입 |
+| `SM5a: verification log missing` | advance-step 시 verification-logs 없음 | L1 Verification Gate를 수행하고 `verification-logs/step-N-verify.md` 생성 후 재시도 |
+| `SM5b: pACS log missing` | advance-step 시 pacs-logs 없음 | L1.5 pACS 채점을 수행하고 `pacs-logs/step-N-pacs.md` 생성 후 재시도 |
+| `SM5c: pACS score is N (RED zone)` | pACS < 50 상태에서 advance 시도 | 약점 차원 개선 후 재채점. 긴급 시 `--force` 사용 (감사 기록 생성) |
+| `SM5d: Review verdict is FAIL` | 리뷰 FAIL 상태에서 advance 시도 | 리뷰 이슈 해결 후 재리뷰. 또는 `--force` 사용 |
 
 ### 9.3 Tier 6 수동 개입
 
@@ -789,6 +796,17 @@ Claude Code 내에서 `/run` 또는 시작 트리거를 입력하면:
 
 **Decision Log**: 자동 승인된 결정은 `autopilot-logs/step-N-decision.md`에 기록된다 (단계, 옵션, 선택 근거).
 
+**SM5 Quality Gate Evidence Guard**: SOT의 `advance-step` 명령 자체에 품질 게이트 증거 검증이 물리적으로 내장되어 있다 (Level A 보호 — LLM이 우회 불가):
+
+| 체크 | 검증 내용 |
+|------|----------|
+| SM5a | `verification-logs/step-N-verify.md` 존재 확인 |
+| SM5b | `pacs-logs/step-N-pacs.md` 존재 확인 |
+| SM5c | pACS 점수 ≥ 50 확인 (RED zone 차단, 2-stage 파싱) |
+| SM5d | `review-logs/step-N-review.md` 존재 시 FAIL verdict 차단 |
+
+`(human)` 단계(4, 8, 18)는 SM5를 건너뛴다. 긴급 시 `--force` 플래그로 우회 가능하지만, `autopilot-logs/sm5-force-audit.jsonl`에 감사 기록이 남는다.
+
 ### 10.4 /start 스킬과 워크플로우 상태 관리
 
 워크플로우 상태에 따라 자동 라우팅된다:
@@ -825,5 +843,5 @@ Claude Code 내에서 `/run` 또는 시작 트리거를 입력하면:
 | [`GLOBALNEWS-README.md`](GLOBALNEWS-README.md) | 시스템 개요, 빠른 시작, 실행 결과 |
 | [`GLOBALNEWS-ARCHITECTURE-AND-PHILOSOPHY.md`](GLOBALNEWS-ARCHITECTURE-AND-PHILOSOPHY.md) | 설계 철학, 4-Layer 시스템 아키텍처 + 5계층 QA |
 | [`prompt/workflow.md`](prompt/workflow.md) | 20-step 워크플로우 설계도 (구축 과정 기록) |
-| [`config/sources.yaml`](config/sources.yaml) | 44개 사이트 설정 (URL, 선택자, 제한) |
+| [`config/sources.yaml`](config/sources.yaml) | 121개 사이트 설정 (URL, 선택자, 제한) |
 | [`data/config/pipeline.yaml`](data/config/pipeline.yaml) | 8-Stage 분석 파이프라인 설정 |

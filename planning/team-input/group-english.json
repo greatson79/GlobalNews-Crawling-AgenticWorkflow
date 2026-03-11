@@ -1,10 +1,10 @@
 {
-  "generated": "2026-02-26T05:01:58Z",
+  "generated": "2026-03-11T11:29:04Z",
   "strategy_group": "english",
   "description": "US/English major news sites",
   "assigned_agent": "@crawl-strategist-en",
   "focus_areas": "Fundus/Trafilatura compatibility, paywall handling (nytimes/ft/wsj/bloomberg)",
-  "site_count": 12,
+  "site_count": 22,
   "sites": [
     {
       "domain": "marketwatch.com",
@@ -34,7 +34,7 @@
       "language": "en",
       "group": "E",
       "label": "US/English Major",
-      "notes": "Paywall — requires undetected-chromedriver",
+      "notes": "Paywall",
       "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
     },
     {
@@ -42,7 +42,7 @@
       "language": "en",
       "group": "E",
       "label": "US/English Major",
-      "notes": "Paywall — requires undetected-chromedriver",
+      "notes": "Paywall",
       "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
     },
     {
@@ -50,7 +50,7 @@
       "language": "en",
       "group": "E",
       "label": "US/English Major",
-      "notes": "Paywall — requires undetected-chromedriver",
+      "notes": "Paywall",
       "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
     },
     {
@@ -90,7 +90,7 @@
       "language": "en",
       "group": "E",
       "label": "US/English Major",
-      "notes": "Paywall — requires undetected-chromedriver",
+      "notes": "Paywall",
       "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
     },
     {
@@ -100,6 +100,76 @@
       "label": "US/English Major",
       "notes": "Spanish-language",
       "recon_row": "| 31 | afmedios.com | Y — /rss (RSS 2.0, 20 items) | Y — sitemap_index.xml | SSR (WordPress) | none | LOW | es | ~6 | ~20 | Easy |"
+    },
+    {
+      "domain": "wired.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "investing.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "qz.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "bbc.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "theguardian.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "thetimes.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": "Paywall"
+    },
+    {
+      "domain": "telegraph.co.uk",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "politico.eu",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "euractiv.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
+    },
+    {
+      "domain": "natureasia.com",
+      "language": "en",
+      "group": "E",
+      "label": "US/English Major",
+      "notes": ""
     }
   ]
 }

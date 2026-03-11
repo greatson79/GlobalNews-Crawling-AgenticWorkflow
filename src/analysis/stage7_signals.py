@@ -155,7 +155,7 @@ PATHWAY_C_BERTREND_REQUIRED: int = 1  # Binary: must be 1
 PATHWAY_C_CROSS_DOMAIN_THRESHOLD: float = 0.3
 
 # Data span requirements (days)
-L1_MIN_DATA_SPAN_DAYS: int = 1
+L1_MIN_DATA_SPAN_DAYS: int = 0  # Allow single-day L1 fad detection
 L2_MIN_DATA_SPAN_DAYS: int = 14
 L3_MIN_DATA_SPAN_DAYS: int = 90
 L4_MIN_DATA_SPAN_DAYS: int = 365
@@ -469,7 +469,7 @@ def classify_signal_layer(feat: TopicFeatures) -> str:
         AND frame_divergence_detected AND data_span_days >= 90
     L2: volume_above_ma14_days >= 7 AND ma_signal == "rising"
         AND emotion_trajectory_shift AND data_span_days >= 14
-    L1: volume_zscore > 3.0 AND burst_score > 2.0 AND data_span_days >= 1
+    L1: volume_zscore > 3.0 AND burst_score > 2.0 AND data_span_days >= 0
 
     Args:
         feat: TopicFeatures with all classification indicators populated.
@@ -1369,9 +1369,8 @@ class Stage7SignalClassifier:
             )
 
         # ---- Data span from article timestamps ----
+        # published_at is now in topics.parquet (propagated from Stage 4)
         published_col = _get_column_safe(topics_data, "published_at")
-        if published_col is None and article_analysis is not None:
-            published_col = _get_column_safe(article_analysis, "published_at")
 
         if published_col is not None:
             published_list = published_col.to_pylist()
@@ -1405,58 +1404,56 @@ class Stage7SignalClassifier:
     def _extract_source_and_steeps(
         self, article_analysis: Any, topics_data: Any
     ) -> None:
-        """Extract source counts, STEEPS categories, and emotion data."""
-        source_col = _get_column_safe(article_analysis, "source")
-        steeps_col = _get_column_safe(article_analysis, "steeps_primary")
-        emotion_shift_col = _get_column_safe(article_analysis, "emotion_trajectory")
+        """Extract source counts, STEEPS categories, and emotion data.
+
+        Data sources (after A3 fix):
+            - source: topics.parquet (propagated from Stage 4 via articles_table)
+            - steeps_category: article_analysis.parquet (Stage 3 output)
+            - published_at: topics.parquet (propagated from Stage 4)
+            - emotion_trajectory: currently unavailable per-article (L2 needs 14+ days)
+        """
+        # Build source lookup from topics_data (source propagated from Stage 4)
+        source_lookup: dict[str, str] = {}
+        topics_aid_col = _get_column_safe(topics_data, "article_id")
+        source_col = _get_column_safe(topics_data, "source")
+        if topics_aid_col is not None and source_col is not None:
+            t_aids = topics_aid_col.to_pylist()
+            t_sources = source_col.to_pylist()
+            for i, aid in enumerate(t_aids):
+                if aid is not None and i < len(t_sources) and t_sources[i]:
+                    source_lookup[str(aid)] = str(t_sources[i])
+
+        # Build steeps lookup from article_analysis
+        steeps_lookup: dict[str, str] = {}
         aa_article_col = _get_column_safe(article_analysis, "article_id")
+        steeps_col = _get_column_safe(article_analysis, "steeps_category")
+        if aa_article_col is not None and steeps_col is not None:
+            aa_ids = aa_article_col.to_pylist()
+            aa_steeps = steeps_col.to_pylist()
+            for i, aid in enumerate(aa_ids):
+                if aid is not None and i < len(aa_steeps) and aa_steeps[i]:
+                    steeps_lookup[str(aid)] = str(aa_steeps[i])
 
-        if aa_article_col is None:
+        if not source_lookup and not steeps_lookup:
             return
-
-        # Build article -> analysis lookup
-        aa_article_ids = aa_article_col.to_pylist()
-        aa_sources = source_col.to_pylist() if source_col is not None else [None] * len(aa_article_ids)
-        aa_steeps = steeps_col.to_pylist() if steeps_col is not None else [None] * len(aa_article_ids)
-        aa_emotion = (
-            emotion_shift_col.to_pylist() if emotion_shift_col is not None
-            else [None] * len(aa_article_ids)
-        )
-
-        article_lookup: dict[str, dict[str, Any]] = {}
-        for i, aid in enumerate(aa_article_ids):
-            if aid is not None:
-                article_lookup[str(aid)] = {
-                    "source": aa_sources[i],
-                    "steeps": aa_steeps[i],
-                    "emotion": aa_emotion[i],
-                }
 
         # Assign to topics
         for tid, feat in self._topic_features.items():
             sources = set()
             steeps = set()
-            has_emotion_shift = False
             for aid in feat.article_ids:
-                info = article_lookup.get(aid)
-                if info is None:
-                    continue
-                if info["source"]:
-                    sources.add(str(info["source"]))
-                if info["steeps"]:
-                    steeps.add(str(info["steeps"]))
-                if info["emotion"] is not None:
-                    # Emotion trajectory: non-zero value indicates shift
-                    try:
-                        if abs(float(info["emotion"])) > 0.1:
-                            has_emotion_shift = True
-                    except (ValueError, TypeError):
-                        pass
+                src = source_lookup.get(aid)
+                if src:
+                    sources.add(src)
+                stp = steeps_lookup.get(aid)
+                if stp:
+                    steeps.add(stp)
 
             feat.source_count = len(sources)
             feat.steeps_categories = steeps
             feat.cross_domain_count = len(steeps)
-            feat.emotion_trajectory_shift = has_emotion_shift
+            # emotion_trajectory_shift stays False until multi-day data
+            # (L2 requires data_span_days >= 14 anyway)
 
             # STEEPS shift detected: topic spans 3+ STEEPS domains
             if feat.cross_domain_count >= 3:

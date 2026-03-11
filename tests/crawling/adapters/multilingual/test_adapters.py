@@ -1,7 +1,7 @@
-"""Tests for multilingual site adapters (Groups F+G, 13 sites).
+"""Tests for multilingual site adapters (Groups F-J, 77 sites).
 
 Validates:
-    - All 13 adapters import and instantiate correctly.
+    - All 77 adapters import and instantiate correctly.
     - Each adapter implements the complete BaseSiteAdapter interface.
     - Site metadata (SITE_ID, LANGUAGE, GROUP) matches specification.
     - Rate limits and anti-block configuration match Step 6 strategy docs.
@@ -11,7 +11,7 @@ Validates:
 
 Reference:
     Step 5 Architecture Blueprint -- SiteAdapter interface.
-    Step 6 crawl-strategy-asia.md (Group F) and crawl-strategy-global.md (Group G).
+    Step 6 crawl-strategy-asia.md (Group F) and crawl-strategy-global.md (Group G-J).
 """
 
 from __future__ import annotations
@@ -28,16 +28,34 @@ from src.crawling.adapters.multilingual import MULTILINGUAL_ADAPTERS
 
 
 class TestAdapterRegistry:
-    """Verify the adapter registry contains all 13 expected sites."""
+    """Verify the adapter registry contains all 77 expected sites."""
 
     EXPECTED_SITE_IDS = [
+        # Group F: Asia-Pacific (23)
         "people", "globaltimes", "scmp", "taiwannews", "yomiuri", "thehindu",
-        "thesun", "bild", "lemonde", "themoscowtimes",
-        "arabnews", "aljazeera", "israelhayom",
+        "mainichi", "asahi", "yahoo_jp", "timesofindia", "hindustantimes",
+        "economictimes", "indianexpress", "philstar", "manilatimes", "inquirer",
+        "jakartapost", "antaranews", "tempo_id", "focustaiwan", "taipeitimes",
+        "vnexpress", "vietnamnews",
+        # Group G: Europe/ME (38)
+        "thesun", "bild", "lemonde", "themoscowtimes", "arabnews", "aljazeera",
+        "israelhayom", "euronews", "spiegel", "sueddeutsche", "welt", "faz",
+        "corriere", "repubblica", "ansa", "elpais", "elmundo", "abc_es",
+        "lavanguardia", "lefigaro", "liberation", "france24", "ouestfrance",
+        "wyborcza", "pap", "idnes", "intellinews", "balkaninsight",
+        "centraleuropeantimes", "aftonbladet", "tv2_no", "yle", "icelandmonitor",
+        "middleeasteye", "almonitor", "haaretz", "jpost", "jordantimes",
+        # Group H: Africa (4)
+        "allafrica", "africanews", "theafricareport", "panapress",
+        # Group I: Latin America (8)
+        "clarin", "lanacion_ar", "folha", "oglobo", "elmercurio", "biobiochile",
+        "eltiempo", "elcomercio_pe",
+        # Group J: Russia/Central Asia (4)
+        "gogo_mn", "ria", "rg", "rbc",
     ]
 
     def test_registry_count(self):
-        assert len(MULTILINGUAL_ADAPTERS) == 13
+        assert len(MULTILINGUAL_ADAPTERS) == 77
 
     @pytest.mark.parametrize("site_id", EXPECTED_SITE_IDS)
     def test_site_in_registry(self, site_id: str):

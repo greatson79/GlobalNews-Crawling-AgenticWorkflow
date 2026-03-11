@@ -9,7 +9,7 @@ Usage:
 Output: JSON with structured site list (domain, language, group) to stdout.
 
 This is a P1 pre-processing script: deterministic extraction, no LLM inference.
-It extracts the 44 news site URLs from either the PRD document (parsing the
+It extracts the 121 news site URLs from either the PRD document (parsing the
 Target Sites table in workflow.md or the data source tables in PRD.md) or from
 a sources.yaml configuration file if it exists.
 """
@@ -24,7 +24,7 @@ import sys
 from typing import Any
 
 # -- Canonical site registry -------------------------------------------------
-# Derived from workflow.md Target Sites table (the authoritative 44-site list).
+# Derived from workflow.md Target Sites table (the authoritative 121-site list).
 # Each entry: (domain, language, group_code, group_label)
 _CANONICAL_SITES: list[tuple[str, str, str, str]] = [
     # Group A — Korean Major Dailies (5)
@@ -42,7 +42,7 @@ _CANONICAL_SITES: list[tuple[str, str, str, str]] = [
     ("nocutnews.co.kr", "ko", "C", "Korean Niche"),
     ("kmib.co.kr", "ko", "C", "Korean Niche"),
     ("ohmynews.com", "ko", "C", "Korean Niche"),
-    # Group D — Korean IT/Science (7)
+    # Group D — Korean IT/Science (10)
     ("38north.org", "en", "D", "Korean IT/Science"),
     ("bloter.net", "ko", "D", "Korean IT/Science"),
     ("etnews.com", "ko", "D", "Korean IT/Science"),
@@ -50,7 +50,10 @@ _CANONICAL_SITES: list[tuple[str, str, str, str]] = [
     ("zdnet.co.kr", "ko", "D", "Korean IT/Science"),
     ("irobotnews.com", "ko", "D", "Korean IT/Science"),
     ("techneedle.com", "ko", "D", "Korean IT/Science"),
-    # Group E — US/English Major (12)
+    ("insight.co.kr", "ko", "D", "Korean IT/Science"),
+    ("stratechery.com", "en", "D", "Korean IT/Science"),
+    ("techmeme.com", "en", "D", "Korean IT/Science"),
+    # Group E — US/English Major (22)
     ("marketwatch.com", "en", "E", "US/English Major"),
     ("voakorea.com", "en", "E", "US/English Major"),
     ("huffingtonpost.com", "en", "E", "US/English Major"),
@@ -63,14 +66,41 @@ _CANONICAL_SITES: list[tuple[str, str, str, str]] = [
     ("edition.cnn.com", "en", "E", "US/English Major"),
     ("bloomberg.com", "en", "E", "US/English Major"),
     ("afmedios.com", "es", "E", "US/English Major"),
-    # Group F — Asia-Pacific (6)
+    ("wired.com", "en", "E", "US/English Major"),
+    ("investing.com", "en", "E", "US/English Major"),
+    ("qz.com", "en", "E", "US/English Major"),
+    ("bbc.com", "en", "E", "US/English Major"),
+    ("theguardian.com", "en", "E", "US/English Major"),
+    ("thetimes.com", "en", "E", "US/English Major"),
+    ("telegraph.co.uk", "en", "E", "US/English Major"),
+    ("politico.eu", "en", "E", "US/English Major"),
+    ("euractiv.com", "en", "E", "US/English Major"),
+    ("natureasia.com", "en", "E", "US/English Major"),
+    # Group F — Asia-Pacific (23)
     ("people.com.cn", "zh", "F", "Asia-Pacific"),
     ("globaltimes.cn", "en", "F", "Asia-Pacific"),
     ("scmp.com", "en", "F", "Asia-Pacific"),
     ("taiwannews.com", "en", "F", "Asia-Pacific"),
     ("yomiuri.co.jp", "ja", "F", "Asia-Pacific"),
     ("thehindu.com", "en", "F", "Asia-Pacific"),
-    # Group G — Europe/Middle East (7)
+    ("mainichi.jp", "ja", "F", "Asia-Pacific"),
+    ("asahi.com", "ja", "F", "Asia-Pacific"),
+    ("yahoo.co.jp", "ja", "F", "Asia-Pacific"),
+    ("timesofindia.indiatimes.com", "en", "F", "Asia-Pacific"),
+    ("hindustantimes.com", "en", "F", "Asia-Pacific"),
+    ("economictimes.indiatimes.com", "en", "F", "Asia-Pacific"),
+    ("indianexpress.com", "en", "F", "Asia-Pacific"),
+    ("philstar.com", "en", "F", "Asia-Pacific"),
+    ("mb.com.ph", "en", "F", "Asia-Pacific"),
+    ("inquirer.net", "en", "F", "Asia-Pacific"),
+    ("thejakartapost.com", "en", "F", "Asia-Pacific"),
+    ("antaranews.com", "en", "F", "Asia-Pacific"),
+    ("tempo.co", "en", "F", "Asia-Pacific"),
+    ("focustaiwan.tw", "en", "F", "Asia-Pacific"),
+    ("taipeitimes.com", "en", "F", "Asia-Pacific"),
+    ("vnexpress.net", "en", "F", "Asia-Pacific"),
+    ("vietnamnews.vn", "en", "F", "Asia-Pacific"),
+    # Group G — Europe/Middle East (38)
     ("thesun.co.uk", "en", "G", "Europe/Middle East"),
     ("bild.de", "de", "G", "Europe/Middle East"),
     ("lemonde.fr", "fr", "G", "Europe/Middle East"),
@@ -78,6 +108,56 @@ _CANONICAL_SITES: list[tuple[str, str, str, str]] = [
     ("arabnews.com", "en", "G", "Europe/Middle East"),
     ("aljazeera.com", "en", "G", "Europe/Middle East"),
     ("israelhayom.com", "en", "G", "Europe/Middle East"),
+    ("euronews.com", "en", "G", "Europe/Middle East"),
+    ("spiegel.de", "de", "G", "Europe/Middle East"),
+    ("sueddeutsche.de", "de", "G", "Europe/Middle East"),
+    ("welt.de", "de", "G", "Europe/Middle East"),
+    ("faz.net", "de", "G", "Europe/Middle East"),
+    ("corriere.it", "it", "G", "Europe/Middle East"),
+    ("repubblica.it", "it", "G", "Europe/Middle East"),
+    ("ansa.it", "it", "G", "Europe/Middle East"),
+    ("elpais.com", "es", "G", "Europe/Middle East"),
+    ("elmundo.es", "es", "G", "Europe/Middle East"),
+    ("abc.es", "es", "G", "Europe/Middle East"),
+    ("lavanguardia.com", "es", "G", "Europe/Middle East"),
+    ("lefigaro.fr", "fr", "G", "Europe/Middle East"),
+    ("liberation.fr", "fr", "G", "Europe/Middle East"),
+    ("france24.com", "fr", "G", "Europe/Middle East"),
+    ("ouest-france.fr", "fr", "G", "Europe/Middle East"),
+    ("wyborcza.pl", "pl", "G", "Europe/Middle East"),
+    ("pap.pl", "pl", "G", "Europe/Middle East"),
+    ("idnes.cz", "cs", "G", "Europe/Middle East"),
+    ("intellinews.com", "en", "G", "Europe/Middle East"),
+    ("balkaninsight.com", "en", "G", "Europe/Middle East"),
+    ("centraleuropeantimes.com", "en", "G", "Europe/Middle East"),
+    ("aftonbladet.se", "sv", "G", "Europe/Middle East"),
+    ("tv2.no", "no", "G", "Europe/Middle East"),
+    ("yle.fi", "fi", "G", "Europe/Middle East"),
+    ("icelandmonitor.mbl.is", "en", "G", "Europe/Middle East"),
+    ("middleeasteye.net", "en", "G", "Europe/Middle East"),
+    ("al-monitor.com", "en", "G", "Europe/Middle East"),
+    ("haaretz.com", "en", "G", "Europe/Middle East"),
+    ("jpost.com", "en", "G", "Europe/Middle East"),
+    ("jordantimes.com", "en", "G", "Europe/Middle East"),
+    # Group H — Africa (4)
+    ("allafrica.com", "en", "H", "Africa"),
+    ("africanews.com", "en", "H", "Africa"),
+    ("theafricareport.com", "en", "H", "Africa"),
+    ("panapress.com", "en", "H", "Africa"),
+    # Group I — Latin America (8)
+    ("clarin.com", "es", "I", "Latin America"),
+    ("lanacion.com.ar", "es", "I", "Latin America"),
+    ("folha.uol.com.br", "pt", "I", "Latin America"),
+    ("oglobo.globo.com", "pt", "I", "Latin America"),
+    ("elmercurio.com", "es", "I", "Latin America"),
+    ("biobiochile.cl", "es", "I", "Latin America"),
+    ("eltiempo.com", "es", "I", "Latin America"),
+    ("elcomercio.pe", "es", "I", "Latin America"),
+    # Group J — Russia/Central Asia (4)
+    ("gogo.mn", "mn", "J", "Russia/Central Asia"),
+    ("ria.ru", "ru", "J", "Russia/Central Asia"),
+    ("rg.ru", "ru", "J", "Russia/Central Asia"),
+    ("rbc.ru", "ru", "J", "Russia/Central Asia"),
 ]
 
 # Group-level metadata for the split_sites_by_group workflow classification
@@ -89,6 +169,9 @@ _GROUP_META: dict[str, dict[str, str]] = {
     "E": {"strategy_group": "english", "description": "US/English Major"},
     "F": {"strategy_group": "asia-pacific", "description": "Asia-Pacific"},
     "G": {"strategy_group": "europe-me", "description": "Europe/Middle East"},
+    "H": {"strategy_group": "multilingual", "description": "Africa"},
+    "I": {"strategy_group": "multilingual", "description": "Latin America"},
+    "J": {"strategy_group": "multilingual", "description": "Russia/Central Asia"},
 }
 
 
@@ -208,7 +291,7 @@ def _extract_from_prd(prd_path: str) -> list[dict[str, Any]] | None:
 
 
 def _build_canonical_sites() -> list[dict[str, Any]]:
-    """Build the full 44-site list from the hardcoded canonical registry."""
+    """Build the full 121-site list from the hardcoded canonical registry."""
     sites: list[dict[str, Any]] = []
     for domain, lang, group, group_label in _CANONICAL_SITES:
         meta = _GROUP_META.get(group, {})
@@ -255,10 +338,10 @@ def main() -> None:
     sites = _try_load_yaml(sources_path)
     data_source = "sources.yaml"
 
-    # Priority 2: Canonical list (authoritative 44-site set from workflow.md),
+    # Priority 2: Canonical list (authoritative 121-site set from workflow.md),
     # enriched with PRD cross-reference data.
     # The PRD sections 4.1/4.2 only list ~14 sites as initial proposals, while
-    # the full 44-site target is defined in workflow.md. The canonical registry
+    # the full 121-site target is defined in workflow.md. The canonical registry
     # is therefore the primary source, and the PRD provides supplementary info.
     if sites is None:
         prd_path = os.path.join(

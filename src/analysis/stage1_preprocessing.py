@@ -144,25 +144,66 @@ ENGLISH_NEWS_STOPWORDS: frozenset[str] = frozenset({
 # Expected language by source_id prefix or explicit mapping.
 # Used to verify langdetect output against known site languages.
 SOURCE_LANGUAGE_MAP: dict[str, str] = {
-    # Korean sites
+    # Group A — Korean Major Dailies (5)
     "chosun": "ko", "joongang": "ko", "donga": "ko", "hani": "ko",
-    "yna": "ko", "mk": "ko", "hankyung": "ko", "fnnews": "ko",
-    "mt": "ko", "nocutnews": "ko", "kmib": "ko",
-    "etnews": "ko", "zdnet_kr": "ko", "bloter": "ko",
-    "ohmynews": "ko", "sciencetimes": "ko", "techneedle": "ko",
-    "irobotnews": "ko", "north38": "ko",
-    # English sites
+    "yna": "ko",
+    # Group B — Korean Economy (4)
+    "mk": "ko", "hankyung": "ko", "fnnews": "ko", "mt": "ko",
+    # Group C — Korean Niche (3)
+    "nocutnews": "ko", "kmib": "ko", "ohmynews": "ko",
+    # Group D — Korean IT/Science (10)
+    "38north": "en", "bloter": "ko", "etnews": "ko",
+    "sciencetimes": "ko", "zdnet_kr": "ko", "irobotnews": "ko",
+    "techneedle": "ko", "insight_kr": "ko",
+    "stratechery": "en", "techmeme": "en",
+    # Group E — English-Language Western (12)
     "nytimes": "en", "wsj": "en", "bloomberg": "en", "ft": "en",
     "cnn": "en", "huffpost": "en", "latimes": "en", "buzzfeed": "en",
     "marketwatch": "en", "nationalpost": "en", "voakorea": "en",
-    "afmedios": "en",
-    # Multilingual / other
-    "aljazeera": "en", "scmp": "en", "thehindu": "en",
-    "thesun": "en", "taiwannews": "en",
-    "globaltimes": "zh", "people": "zh",
-    "yomiuri": "ja", "bild": "de", "lemonde": "fr",
-    "arabnews": "ar", "israelhayom": "he",
-    "themoscowtimes": "en",
+    "afmedios": "es",
+    # Group F — Asia-Pacific (17)
+    "globaltimes": "zh", "people": "zh", "scmp": "en",
+    "taiwannews": "en", "yomiuri": "ja", "thehindu": "en",
+    "asahi": "ja", "yahoo_jp": "ja", "mainichi": "en",
+    "focustaiwan": "en", "taipeitimes": "en",
+    "hindustantimes": "en", "indianexpress": "en", "economictimes": "en",
+    "timesofindia": "en", "natureasia": "en",
+    "inquirer": "en",
+    # Group F — Southeast Asia
+    "jakartapost": "en", "tempo_id": "en", "manilatimes": "en",
+    "philstar": "en", "antaranews": "en",
+    "vietnamnews": "en", "vnexpress": "en",
+    # Group G — Europe/Middle East (26)
+    "thesun": "en", "bild": "de", "lemonde": "fr",
+    "themoscowtimes": "en", "arabnews": "en",
+    "aljazeera": "en", "israelhayom": "en",
+    "bbc": "en", "theguardian": "en", "telegraph": "en", "thetimes": "en",
+    "wired": "en", "politico_eu": "en", "euractiv": "en", "euronews": "en",
+    "spiegel": "de", "faz": "de", "welt": "de", "sueddeutsche": "de",
+    "elpais": "es", "elmundo": "es", "lavanguardia": "es", "abc_es": "es",
+    "lefigaro": "fr", "liberation": "fr", "ouestfrance": "fr", "france24": "fr",
+    "corriere": "it", "repubblica": "it", "ansa": "it",
+    "wyborcza": "pl", "pap": "pl",
+    "idnes": "cs",
+    "aftonbladet": "sv",
+    "tv2_no": "no",
+    "yle": "en",
+    "icelandmonitor": "en",
+    "haaretz": "en", "jpost": "en",
+    "almonitor": "en", "middleeasteye": "en", "jordantimes": "en",
+    "balkaninsight": "en", "centraleuropeantimes": "en", "intellinews": "en",
+    "investing": "en", "qz": "en",
+    # Group H — Africa (4)
+    "allafrica": "en", "africanews": "en",
+    "theafricareport": "en", "panapress": "en",
+    # Group I — Latin America (8)
+    "clarin": "es", "lanacion_ar": "es",
+    "folha": "pt", "oglobo": "pt",
+    "eltiempo": "es", "elcomercio_pe": "es",
+    "biobiochile": "es", "elmercurio": "es",
+    # Group J — Russia/Central Asia (4)
+    "ria": "ru", "rg": "ru", "rbc": "ru",
+    "gogo_mn": "mn",
 }
 
 # =============================================================================

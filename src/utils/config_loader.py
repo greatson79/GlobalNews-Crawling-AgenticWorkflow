@@ -75,7 +75,7 @@ def validate_sources_config(config: dict[str, Any]) -> list[str]:
         - url: valid URL starting with http:// or https://
         - region: one of VALID_REGIONS
         - language: ISO 639-1 code
-        - group: A-G
+        - group: A-J
         - crawl.primary_method: rss/sitemap/api/playwright/dom
         - crawl.rate_limit_seconds: integer >= 1
         - anti_block.ua_tier: 1-4
@@ -121,7 +121,8 @@ def validate_sources_config(config: dict[str, Any]) -> list[str]:
         if not isinstance(url, str) or not (url.startswith("http://") or url.startswith("https://")):
             errors.append(f"{prefix}: 'url' must start with http:// or https://")
 
-        if site.get("region") not in VALID_REGIONS:
+        region_val = (site.get("region") or "").lower()
+        if region_val not in VALID_REGIONS:
             errors.append(f"{prefix}: 'region' must be one of {VALID_REGIONS}, got '{site.get('region')}'")
 
         if site.get("language") not in VALID_LANGUAGES:
@@ -385,7 +386,7 @@ def get_sites_by_group(group: str) -> list[str]:
     """Get site source_ids belonging to a specific group.
 
     Args:
-        group: Group letter (A-G).
+        group: Group letter (A-J).
 
     Returns:
         List of source_id strings in the specified group.

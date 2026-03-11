@@ -1,6 +1,6 @@
 # GlobalNews — 뉴스 크롤링 & 빅데이터 분석 시스템
 
-> **44개 국제 뉴스 사이트 자동 수집 → 56개 NLP 분석 기법 → 5-Layer 신호 분류 → Parquet/SQLite 출력**
+> **121개 국제 뉴스 사이트 자동 수집 → 56개 NLP 분석 기법 → 5-Layer 신호 분류 → Parquet/SQLite 출력**
 
 | 항목 | 내용 |
 |------|------|
@@ -9,7 +9,7 @@
 | **산출물** | Parquet (ZSTD) + SQLite (FTS5/vec) + Streamlit 대시보드 |
 | **실행 환경** | MacBook M2 Pro, 48GB RAM, Claude API $0 |
 | **상태** | Production-Ready — 20/20 단계 완료 |
-| **코드 규모** | 91개 Python 모듈, ~41,500 LOC (src) + ~22,000 LOC (tests) |
+| **코드 규모** | 93개 Python 모듈, ~42,200 LOC (src) + ~22,350 LOC (tests) |
 
 > **부모-자식 관계**: 이 프로젝트는 AgenticWorkflow 프레임워크(만능줄기세포)로부터 태어난 **자식 시스템**이다.
 > 부모 문서(AGENTICWORKFLOW-*.md)는 방법론·프레임워크를, 자식 문서(GLOBALNEWS-*.md)는 **도메인 고유 시스템**을 기술한다.
@@ -20,17 +20,21 @@
 ## 핵심 스펙
 
 ```
-INPUT:  44개 뉴스 사이트 (7개 그룹, 9개 언어)
+INPUT:  121개 뉴스 사이트 (10개 그룹, 14+ 언어)
         ├── Group A: 한국 주요 일간지 (5): 조선, 중앙, 동아, 한겨레, 연합
         ├── Group B: 한국 경제지 (4): 매경, 한경, 파이낸셜, 머니투데이
         ├── Group C: 한국 니치 (3): 노컷, 국민, 오마이
-        ├── Group D: 한국 IT/과학 (7): 38North, Bloter, 전자, 과학기술, ZDNet, 로봇, 테크니들
-        ├── Group E: 미국/영어권 (12): MarketWatch, VOA, HuffPost, NYT, FT, WSJ, LA Times,
-        │                                 BuzzFeed, NationalPost, CNN, Bloomberg, AFMedios
-        ├── Group F: 아시아-태평양 (6): People's Daily, GlobalTimes, SCMP, TaiwanNews,
-        │                                 Yomiuri, TheHindu
-        └── Group G: 유럽/중동 (7): TheSun, Bild, LeMonde, MoscowTimes, ArabNews,
-                                     AlJazeera, IsraelHayom
+        ├── Group D: 한국 IT/과학 (10): 38North, Bloter, 전자, 과학기술, ZDNet,
+        │                                  로봇, 테크니들, Insight, Stratechery, Techmeme
+        ├── Group E: 영어권 (22): NYT, FT, WSJ, CNN, Bloomberg, BBC, Guardian,
+        │                           Wired, HuffPost, MarketWatch, Politico EU 등
+        ├── Group F: 아시아-태평양 (23): SCMP, Yomiuri, Mainichi, TheHindu,
+        │                                  Inquirer, JakartaPost, VNExpress 등
+        ├── Group G: 유럽/중동 (38): LeMonde, Spiegel, Corriere, ElPais,
+        │                              AlJazeera, Haaretz, France24 등
+        ├── Group H: 아프리카 (4): AllAfrica, Africanews, TheAfricaReport, Panapress
+        ├── Group I: 라틴 아메리카 (8): Clarin, Folha, ElMercurio, ElTiempo 등
+        └── Group J: 러시아/중앙아시아 (4): RIA, RG, RBC, GoGo Mongolia
 
 PIPELINE:  8단계 NLP 분석 파이프라인 (56개 분석 기법)
         Stage 1: 전처리 (Kiwi + spaCy) ──────────────→ articles.parquet
@@ -129,7 +133,7 @@ streamlit run dashboard.py
 |------|-----|
 | 수집 기사 | 1,286건 (raw JSONL) |
 | 처리 기사 | 1,103건 (중복 제거 후) |
-| 성공 소스 | 24/44 사이트 |
+| 성공 소스 | 24/44 사이트 (44-site 설정 기준) |
 | 토픽 발견 | 44개 토픽 |
 | 분석 컬럼 | 21개 (감성, 감정 8차원, STEEPS, 중요도 등) |
 | 출력 크기 | analysis.parquet 2.3MB + index.sqlite 6.0MB |
@@ -150,7 +154,7 @@ GlobalNews-Crawling-AgenticWorkflow/
 ├── pyproject.toml               ← 프로젝트 메타데이터 + 린터 설정
 ├── pytest.ini                   ← 테스트 설정
 │
-├── src/                         ← 핵심 소스 코드 (91개 모듈, ~41,500 LOC)
+├── src/                         ← 핵심 소스 코드 (93개 모듈, ~42,200 LOC)
 │   ├── config/                  ← 상수 + 설정 관리
 │   │   └── constants.py         (350+ 상수: 경로, 임계값, 스키마)
 │   ├── crawling/                ← 크롤링 엔진
@@ -161,14 +165,14 @@ GlobalNews-Crawling-AgenticWorkflow/
 │   │   ├── browser_renderer.py  (서브프로세스 Patchright/Playwright 렌더링)
 │   │   ├── adaptive_extractor.py (4-stage CSS 적응형 추출)
 │   │   ├── dedup.py             (3-Level: URL → Title → SimHash)
-│   │   ├── anti_block.py        (6-Tier 에스컬레이션)
-│   │   ├── retry_manager.py     (4-Level 재시도, 최대 90회)
-│   │   └── adapters/            (44개 사이트별 어댑터)
+│   │   ├── anti_block.py        (6-Tier 에스컬레이션 + DynamicBypassEngine)
+│   │   ├── retry_manager.py     (4-Level 재시도, 최대 90회, 12개 전략)
+│   │   └── adapters/            (121개 사이트별 어댑터)
 │   │       ├── base_adapter.py  (추상 기반 클래스)
-│   │       ├── kr_major/        (11: 조선, 중앙, 동아, 한겨레, 연합 등)
-│   │       ├── kr_tech/         (8: Bloter, 전자신문, ZDNet 등)
-│   │       ├── english/         (12: NYT, FT, WSJ, CNN, Bloomberg 등)
-│   │       └── multilingual/    (13: AlJazeera, SCMP, Bild, LeMonde 등)
+│   │       ├── kr_major/        (12: 조선, 중앙, 동아, 한겨레, 연합 등)
+│   │       ├── kr_tech/         (10: Bloter, 전자신문, ZDNet, Insight 등)
+│   │       ├── english/         (22: NYT, FT, WSJ, CNN, Bloomberg, BBC 등)
+│   │       └── multilingual/    (77: AlJazeera, SCMP, Spiegel, Corriere 등)
 │   ├── analysis/                ← 8단계 NLP 파이프라인
 │   │   ├── pipeline.py          (분석 오케스트레이터)
 │   │   ├── stage1_preprocessing.py   (전처리: Kiwi + spaCy)
@@ -189,7 +193,7 @@ GlobalNews-Crawling-AgenticWorkflow/
 │       └── self_recovery.py     (자기 복구 메커니즘)
 │
 ├── config/                      ← 설정 파일
-│   ├── sources.yaml             (44개 사이트 설정)
+│   ├── sources.yaml             (121개 사이트 설정)
 │   ├── review-focus.yaml        (단계별 리뷰 집중 영역 — Framework config)
 │   ├── output-structure.yaml    (단계별 산출물 구조 패턴 — Framework config)
 │   └── crontab.txt              (cron 설정 템플릿)
@@ -210,10 +214,10 @@ GlobalNews-Crawling-AgenticWorkflow/
 │   ├── run_weekly_rescan.sh     (주간 사이트 점검)
 │   └── archive_old_data.sh      (월간 아카이빙)
 │
-├── tests/                       ← 테스트 (40개 파일, ~2,028 테스트)
+├── tests/                       ← 테스트 (45개 파일, ~2,547 테스트)
 │   ├── unit/                    (단위 테스트)
 │   ├── integration/             (통합 테스트)
-│   ├── structural/              (구조 테스트)
+│   ├── structural/              (구조 테스트 + D-7 동기화 검증)
 │   └── crawling/                (크롤링 테스트)
 │
 ├── research/                    ← Research Phase 산출물
@@ -227,7 +231,7 @@ GlobalNews-Crawling-AgenticWorkflow/
 
 ### D1 — Dynamic-First 크롤링 + 페이월 바이패스
 
-5단계 크롤링 전략: 정적 HTML → DOM 탐색 → 동적 렌더링(Playwright/Patchright) → 적응형 CSS 추출(AdaptiveExtractor) → Title-only fallback. 각 사이트별 맞춤 어댑터로 44개 사이트를 개별 최적화.
+5단계 크롤링 전략: 정적 HTML → DOM 탐색 → 동적 렌더링(Playwright/Patchright) → 적응형 CSS 추출(AdaptiveExtractor) → Title-only fallback. 각 사이트별 맞춤 어댑터로 121개 사이트를 개별 최적화. **DynamicBypassEngine**이 7가지 차단 유형별 최적 전략을 5-Tier로 자동 에스컬레이션하며, Phase A(12개 전략 디스패치) → Phase B(TotalWar fallback)의 **Never-Abandon 루프**로 수집률을 극대화한다.
 
 **하드 페이월 사이트** (FT, NYTimes, WSJ, Bloomberg, Le Monde): `BrowserRenderer`가 서브프로세스에서 Patchright를 실행하여 쿠키 없는 "첫 방문" 경험으로 기사 전문 추출. 실패 시 `AdaptiveExtractor`가 4-stage CSS 선택자 전략으로 본문 추출. `is_paywall_body()`가 영어+프랑스어 14개 강력 패턴 + 12개 약한 패턴으로 페이월 잔존 여부를 결정론적으로 판별.
 
@@ -240,6 +244,7 @@ Level 3: Crawler ×3 (라운드, 딜레이 증가)
 Level 4: Pipeline ×3 (전체 재시작)
 ────────────────────────────────────────────
 이론적 최대: 5 × 2 × 3 × 3 = 90회 자동 시도
+Never-Abandon: DynamicBypassEngine (Phase A) → TotalWar fallback (Phase B)
 Tier 6: Claude Code 인터랙티브 분석으로 에스컬레이션
 ```
 
@@ -307,7 +312,7 @@ df.groupby('topic_label')['sentiment_score'].mean().sort_values()
 ## 테스트
 
 ```bash
-# 전체 테스트 실행 (2,028 테스트)
+# 전체 테스트 실행 (~2,547 테스트)
 pytest
 
 # 카테고리별 실행
@@ -327,13 +332,13 @@ pytest -m "not slow"     # 느린 NLP 모델 테스트 제외
 |-------------|----------|
 | 3단계 구조 | Research (4단계) → Planning (4단계) → Implementation (12단계) |
 | SOT 패턴 | `.claude/state.yaml` — 단일 상태 파일, Orchestrator만 쓰기 |
-| 5계층 QA | L0(a-d) Anti-Skip → Pre-L1 /simplify → L1 Verification → L1.5 pACS → L2 Review(+Focus) |
-| P1 할루시네이션 봉쇄 | 11개 결정론적 검증 스크립트 (10 `validate_*.py` + `diagnose_context.py`) |
+| 5계층 QA | L0(a-d) Anti-Skip → Pre-L1 /simplify → L1 Verification → L1.5 pACS → L2 Review(+Focus) + SM5 SOT-Level 강제 |
+| P1 할루시네이션 봉쇄 | 13개 결정론적 검증 스크립트 (11 `validate_*.py` + `diagnose_context.py` + SM5 gate evidence guard in `sot_manager.py`) + D-7 동기화 테스트 |
 | P2 전문가 위임 | 32개 전문 서브에이전트 |
 | Safety Hooks | 위험 명령 차단(exit 2) + 시크릿 출력 감지(경고) + TDD 보호 + 예측적 디버깅 |
 | Context Preservation | 스냅샷 + Knowledge Archive + RLM 복원 + Learned Patterns 표면화 + Importance-Based Retention + Phase-Aware Compact |
 
-**도메인 고유 변이**: 4-Level 재시도 (90회, Circuit Breaker 무진전 감지 포함), 44-site Adapter Pattern, 5-Layer Signal Hierarchy, Date-Partitioned Storage, Conductor Pattern, HQ Gates (4종 Human-step 품질 검증), Autopilot Mode, Paywall Bypass System (BrowserRenderer + AdaptiveExtractor + is_paywall_body 영어/프랑스어 26패턴)
+**도메인 고유 변이**: 4-Level 재시도 (90회, Circuit Breaker 무진전 감지 포함), 121-site Adapter Pattern (10 Groups, A-J), DynamicBypassEngine (12개 전략, 5-Tier, 7 BlockTypes) + Never-Abandon 루프, 5-Layer Signal Hierarchy, Date-Partitioned Storage, Conductor Pattern, HQ Gates (4종 Human-step 품질 검증), Autopilot Mode, Paywall Bypass System (BrowserRenderer + AdaptiveExtractor + is_paywall_body 영어/프랑스어 26패턴), SM5 Quality Gate Evidence Guard (SOT advance 시 verification+pACS 증거 물리적 강제), P1 사이트 레지스트리 교차 검증 (`validate_site_registry_sync.py` — 5개 소스 동기화)
 
 ---
 

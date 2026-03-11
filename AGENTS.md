@@ -28,7 +28,7 @@ AgenticWorkflow는 자식 agentic workflow system을 낳는 **부모 유기체**
 | SOT 패턴 | `state.yaml` — 단일 파일 + 단일 쓰기 지점 |
 | 3단계 구조 | Research → Planning → Implementation 구조 제약 |
 | 4계층 검증 | L0 Anti-Skip → L1 Verification → L1.5 pACS → L2 Review |
-| P1 봉쇄 | Python 결정론적 검증 스크립트 |
+| P1 봉쇄 | Python 결정론적 검증 스크립트 + SM5 SOT-Level 증거 강제 |
 | Safety Hook | 위험 명령 차단 + TDD Guard |
 | Adversarial Review | `@reviewer` + `@fact-checker` Generator-Critic 패턴 |
 | Decision Log | 자동 승인 결정의 근거 기록 |
@@ -1022,6 +1022,25 @@ FAIL → Rework (최대 10회, 무진전 시 조기 에스컬레이션) → Re-r
 
 독립 실행 스크립트: `python3 .claude/hooks/scripts/validate_verification.py --step N --project-dir .`
 출력: JSON `{"valid": true, "checks": {"V1a": true, "V1b": true, "V1c": true}}`
+
+#### SM5 Quality Gate Evidence Guard (SOT-Level P1 봉쇄)
+
+SOT `advance-step` 명령 자체에 품질 게이트 증거 검증을 내장하여, LLM이 품질 게이트를 건너뛸 수 없게 만든다 (Level B → Level A 승격):
+
+| 체크 | 검증 내용 | 함수 | 위치 |
+|------|----------|------|------|
+| SM5a | verification-logs/step-N-verify.md 존재 | `_check_gate_evidence()` | `sot_manager.py` |
+| SM5b | pacs-logs/step-N-pacs.md 존재 | `_check_gate_evidence()` | `sot_manager.py` |
+| SM5c | pACS ≥ 50 (RED zone 차단, 2-stage 파싱) | `_check_gate_evidence()` | `sot_manager.py` |
+| SM5d | review-logs verdict ≠ FAIL (존재 시) | `_check_gate_evidence()` | `sot_manager.py` |
+
+**Level A vs Level B**: Level A는 Python이 물리적으로 강제 (LLM이 우회 불가). Level B는 Python이 검증하지만 LLM이 호출해야 함. SM5는 품질 게이트를 Level B에서 Level A로 승격시킨다.
+
+- `(human)` 단계(4, 8, 18)는 SM5 건너뜀
+- SM5c 파싱: 2-stage — `_PACS_WITH_MIN_RE`(min 공식) → `_PACS_SIMPLE_RE`(단순 매칭). D-7 `_context_lib.py` 정합
+- `--force` 플래그: SM5 우회 + `autopilot-logs/sm5-force-audit.jsonl` 감사 기록
+- 체크 순서: lock 내부 CR-1 → SM3 → SM4 → SM5 → advance (올바른 에러 메시지 보장)
+- 테스트: 17개 SM5 전용 테스트 (`tests/unit/test_sot_manager.py::TestSM5GateEvidence`)
 
 #### 이슈 심각도 분류
 

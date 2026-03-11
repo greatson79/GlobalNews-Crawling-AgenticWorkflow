@@ -1,10 +1,10 @@
 {
-  "generated": "2026-02-26T05:01:58Z",
+  "generated": "2026-03-11T11:29:04Z",
   "strategy_group": "kr-tech",
   "description": "Korean IT/Science specialty sites",
   "assigned_agent": "@crawl-strategist-kr",
   "focus_areas": "Simpler structures, tech-focused content, mixed Korean/English",
-  "site_count": 7,
+  "site_count": 10,
   "sites": [
     {
       "domain": "38north.org",
@@ -61,6 +61,27 @@
       "label": "Korean IT/Science",
       "notes": "",
       "recon_row": "| 19 | techneedle.com | Likely Y — /feed | Y — /sitemap.xml | SSR (WordPress) | none | HIGH | ko | ~5 | ~5 | Hard |"
+    },
+    {
+      "domain": "insight.co.kr",
+      "language": "ko",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": ""
+    },
+    {
+      "domain": "stratechery.com",
+      "language": "en",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "English-language tech analysis"
+    },
+    {
+      "domain": "techmeme.com",
+      "language": "en",
+      "group": "D",
+      "label": "Korean IT/Science",
+      "notes": "English-language tech aggregator"
     }
   ]
 }

@@ -17,6 +17,22 @@ import time
 import pytest
 
 
+def _create_gate_evidence(project_dir, step_num, pacs_score=75):
+    """Helper: create verification + pACS log files for SM5 gate checks."""
+    for d in ("verification-logs", "pacs-logs"):
+        os.makedirs(os.path.join(project_dir, d), exist_ok=True)
+    verify_path = os.path.join(
+        project_dir, "verification-logs", f"step-{step_num}-verify.md"
+    )
+    with open(verify_path, "w") as f:
+        f.write(f"# Verification — Step {step_num}\n\nAll criteria: PASS\n")
+    pacs_path = os.path.join(
+        project_dir, "pacs-logs", f"step-{step_num}-pacs.md"
+    )
+    with open(pacs_path, "w") as f:
+        f.write(f"# pACS — Step {step_num}\n\npACS = {pacs_score}\n")
+
+
 # ============================================================================
 # CR-1: Step range validation
 # ============================================================================
@@ -120,6 +136,7 @@ class TestCmdAdvanceStep:
         pd = str(tmp_project_with_sot)
         create_output(pd, "research/output.md")
         sot_mod.cmd_record_output(pd, 1, "research/output.md")
+        _create_gate_evidence(pd, 1)  # SM5: gate evidence required
         result = sot_mod.cmd_advance_step(pd, 1)
         assert result["valid"] is True
         assert result["current_step"] == 2
@@ -170,6 +187,9 @@ class TestCmdAdvanceStep:
 
         sot_mod._write_sot_atomic(sot, data)
 
+        # SM5: gate evidence required for non-human step 3
+        _create_gate_evidence(pd, 3)
+
         # Now try to advance step 3 (would go to step 4, but total is 3)
         # step_num=3 is within total_steps, and 3+1=4 is allowed (step 4 = "done" state)
         result = sot_mod.cmd_advance_step(pd, 3)
@@ -182,6 +202,225 @@ class TestCmdAdvanceStep:
         result = sot_mod.cmd_advance_step(pd, 25)
         assert result["valid"] is False
         assert "SM-R1" in result["error"]
+
+
+# ============================================================================
+# SM5: Quality Gate Evidence Guard (P1 Hallucination Prevention)
+# ============================================================================
+
+class TestSM5GateEvidence:
+    """Tests for SM5 quality gate evidence checks in cmd_advance_step.
+
+    SM5 makes it physically impossible to advance a step without quality
+    gate evidence files, preventing the most critical hallucination vector.
+    """
+
+    def _setup_step(self, sot_mod, pd, step_num=1):
+        """Helper: record output for step so SM3/SM4 pass, leaving SM5 as the gate."""
+        outpath = f"output/step-{step_num}.md"
+        full = os.path.join(pd, outpath)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w") as f:
+            f.write("x" * 200)
+        sot_mod.cmd_record_output(pd, step_num, outpath)
+
+    def test_sm5a_no_verification_log_blocked(self, sot_mod, tmp_project_with_sot):
+        """SM5a: Advance blocked when verification log is missing."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is False
+        assert "SM5a" in result["error"]
+        assert "verification" in result["error"]
+
+    def test_sm5b_no_pacs_log_blocked(self, sot_mod, tmp_project_with_sot):
+        """SM5b: Advance blocked when pACS log is missing (verification exists)."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        # Create only verification log, no pACS
+        vdir = os.path.join(pd, "verification-logs")
+        os.makedirs(vdir, exist_ok=True)
+        with open(os.path.join(vdir, "step-1-verify.md"), "w") as f:
+            f.write("# Verification\nAll: PASS\n")
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is False
+        assert "SM5b" in result["error"]
+        assert "pACS" in result["error"]
+
+    def test_sm5c_red_zone_blocked(self, sot_mod, tmp_project_with_sot):
+        """SM5c: Advance blocked when pACS score is RED (< 50)."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        _create_gate_evidence(pd, 1, pacs_score=35)  # RED zone
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is False
+        assert "SM5c" in result["error"]
+        assert "RED" in result["error"]
+
+    def test_sm5c_yellow_zone_passes(self, sot_mod, tmp_project_with_sot):
+        """SM5c: pACS score 50-69 (YELLOW) should pass — only RED blocks."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        _create_gate_evidence(pd, 1, pacs_score=55)
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is True
+
+    def test_sm5d_review_fail_blocked(self, sot_mod, tmp_project_with_sot):
+        """SM5d: Advance blocked when review verdict is FAIL."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        _create_gate_evidence(pd, 1, pacs_score=75)
+        # Create review log with FAIL verdict
+        rdir = os.path.join(pd, "review-logs")
+        os.makedirs(rdir, exist_ok=True)
+        with open(os.path.join(rdir, "step-1-review.md"), "w") as f:
+            f.write("# Review\n\nVerdict: **FAIL**\n\n- Critical issue found\n")
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is False
+        assert "SM5d" in result["error"]
+
+    def test_sm5d_review_pass_allowed(self, sot_mod, tmp_project_with_sot):
+        """SM5d: Review with PASS verdict should not block."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        _create_gate_evidence(pd, 1, pacs_score=75)
+        rdir = os.path.join(pd, "review-logs")
+        os.makedirs(rdir, exist_ok=True)
+        with open(os.path.join(rdir, "step-1-review.md"), "w") as f:
+            f.write("# Review\n\nVerdict: **PASS**\n\nNo issues.\n")
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is True
+
+    def test_sm5d_no_review_log_allowed(self, sot_mod, tmp_project_with_sot):
+        """SM5d: Absent review log should not block (review is optional)."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        _create_gate_evidence(pd, 1, pacs_score=75)
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is True
+
+    def test_sm5_human_step_exempt(self, sot_mod, tmp_project_with_sot, create_output):
+        """SM5: Human steps (4, 8, 18) are exempt from gate evidence checks."""
+        pd = str(tmp_project_with_sot)
+        # Advance to step 4 by setting up steps 1-3 with gate evidence
+        data, sot = sot_mod._read_sot(pd)
+        wf = sot_mod._extract_wf(data)
+        wf["current_step"] = 4
+        for i in range(1, 4):
+            outpath = f"output/step-{i}.md"
+            full = os.path.join(pd, outpath)
+            os.makedirs(os.path.dirname(full), exist_ok=True)
+            with open(full, "w") as f:
+                f.write("x" * 200)
+            wf.setdefault("outputs", {})[f"step-{i}"] = outpath
+        sot_mod._write_sot_atomic(sot, data)
+        # Record output for step 4 (human step — no gate evidence needed)
+        create_output(pd, "output/step-4.md")
+        sot_mod.cmd_record_output(pd, 4, "output/step-4.md")
+        # Advance step 4 WITHOUT gate evidence — should succeed (human step)
+        result = sot_mod.cmd_advance_step(pd, 4)
+        assert result["valid"] is True
+        assert result["current_step"] == 5
+
+    def test_sm5_force_bypasses_gates(self, sot_mod, tmp_project_with_sot):
+        """SM5: --force flag bypasses gate evidence checks with warning."""
+        pd = str(tmp_project_with_sot)
+        outpath = "output/step-1.md"
+        full = os.path.join(pd, outpath)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w") as f:
+            f.write("x" * 200)
+        sot_mod.cmd_record_output(pd, 1, outpath)
+        # No gate evidence — but force=True
+        result = sot_mod.cmd_advance_step(pd, 1, force=True)
+        assert result["valid"] is True
+        assert "warning" in result
+        assert "SM5" in result["warning"]
+
+    def test_sm5_all_gates_pass(self, sot_mod, tmp_project_with_sot):
+        """SM5: All gate evidence present + GREEN pACS → advance succeeds."""
+        pd = str(tmp_project_with_sot)
+        outpath = "output/step-1.md"
+        full = os.path.join(pd, outpath)
+        os.makedirs(os.path.dirname(full), exist_ok=True)
+        with open(full, "w") as f:
+            f.write("x" * 200)
+        sot_mod.cmd_record_output(pd, 1, outpath)
+        _create_gate_evidence(pd, 1, pacs_score=85)
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is True
+        assert result["current_step"] == 2
+
+    def test_sm5c_min_formula_red_blocked(self, sot_mod, tmp_project_with_sot):
+        """C1-fix: SM5c must parse 'pACS = min(F, C, L) = 35' correctly as RED."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        # Create verification log
+        vdir = os.path.join(pd, "verification-logs")
+        os.makedirs(vdir, exist_ok=True)
+        with open(os.path.join(vdir, "step-1-verify.md"), "w") as f:
+            f.write("# Verification\nAll: PASS\n")
+        # Create pACS log with min formula — this is the real-world format
+        pdir = os.path.join(pd, "pacs-logs")
+        os.makedirs(pdir, exist_ok=True)
+        with open(os.path.join(pdir, "step-1-pacs.md"), "w") as f:
+            f.write(
+                "# pACS — Step 1\n\n"
+                "| F | 40 |\n| C | 35 |\n| L | 45 |\n\n"
+                "pACS = min(F, C, L) = 35\n"
+            )
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is False
+        assert "SM5c" in result["error"]
+        assert "35" in result["error"]
+
+    def test_sm5c_min_formula_green_passes(self, sot_mod, tmp_project_with_sot):
+        """C1-fix: SM5c must parse 'pACS = min(F, C, L) = 75' correctly as GREEN."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        vdir = os.path.join(pd, "verification-logs")
+        os.makedirs(vdir, exist_ok=True)
+        with open(os.path.join(vdir, "step-1-verify.md"), "w") as f:
+            f.write("# Verification\nAll: PASS\n")
+        pdir = os.path.join(pd, "pacs-logs")
+        os.makedirs(pdir, exist_ok=True)
+        with open(os.path.join(pdir, "step-1-pacs.md"), "w") as f:
+            f.write(
+                "# pACS — Step 1\n\n"
+                "| F | 80 |\n| C | 75 |\n| L | 82 |\n\n"
+                "pACS = min(F, C, L) = 75\n"
+            )
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is True
+
+    def test_sm5c_unparseable_warns(self, sot_mod, tmp_project_with_sot):
+        """H1-fix: Unparseable pACS log should warn but not block."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        vdir = os.path.join(pd, "verification-logs")
+        os.makedirs(vdir, exist_ok=True)
+        with open(os.path.join(vdir, "step-1-verify.md"), "w") as f:
+            f.write("# Verification\nAll: PASS\n")
+        pdir = os.path.join(pd, "pacs-logs")
+        os.makedirs(pdir, exist_ok=True)
+        with open(os.path.join(pdir, "step-1-pacs.md"), "w") as f:
+            f.write("# pACS — Step 1\n\nNo score here, just text.\n")
+        result = sot_mod.cmd_advance_step(pd, 1)
+        assert result["valid"] is True
+        assert "sm5_warnings" in result
+        assert any("SM5c-warn" in w for w in result["sm5_warnings"])
+
+    def test_sm5_force_creates_audit_log(self, sot_mod, tmp_project_with_sot):
+        """H3-fix: --force should create an audit trail entry."""
+        pd = str(tmp_project_with_sot)
+        self._setup_step(sot_mod, pd)
+        sot_mod.cmd_advance_step(pd, 1, force=True)
+        audit_path = os.path.join(pd, "autopilot-logs", "sm5-force-audit.jsonl")
+        assert os.path.exists(audit_path)
+        with open(audit_path, "r") as f:
+            content = f.read()
+        assert '"step": 1' in content
+        assert "SM5 gate bypass" in content
 
 
 # ============================================================================
@@ -424,6 +663,7 @@ class TestCmdSetStatus:
     def test_set_status_completed_at_final_step(self, sot_mod, tmp_project_with_sot):
         """SM-ST1: 'completed' succeeds when current_step >= total_steps."""
         pd = str(tmp_project_with_sot)
+        human_steps = {4, 8, 18}
         # Create dummy output files and advance step by step to step 20
         for step in range(1, 20):
             out_path = os.path.join(pd, f"research/step-{step}.md")
@@ -431,6 +671,8 @@ class TestCmdSetStatus:
             with open(out_path, "w") as f:
                 f.write("x" * 200)
             sot_mod.cmd_record_output(pd, step, f"research/step-{step}.md")
+            if step not in human_steps:
+                _create_gate_evidence(pd, step, pacs_score=75)
             res = sot_mod.cmd_advance_step(pd, step)
             assert res["valid"], f"Advance step {step} failed: {res}"
         result = sot_mod.cmd_set_status(pd, "completed")

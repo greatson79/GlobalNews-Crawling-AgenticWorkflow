@@ -468,6 +468,100 @@ class BaseSiteAdapter(ABC):
 
         return soup_element.get_text(separator="\n", strip=True)
 
+    def _default_extract(self, html: str, url: str) -> dict[str, Any]:
+        """Generic article extraction using class-level CSS selectors.
+
+        Provides a working default for adapters that rely on standard
+        HTML structure with JSON-LD metadata. Uses TITLE_CSS, BODY_CSS,
+        DATE_CSS, AUTHOR_CSS selectors defined on the subclass.
+
+        Subclasses with non-standard page structures should override
+        ``extract_article`` directly (see CNNAdapter for an example).
+
+        Args:
+            html: Raw HTML content of the article page.
+            url: Canonical URL of the article.
+
+        Returns:
+            Dictionary with title, body, published_at, author, category,
+            is_paywall_truncated.
+        """
+        try:
+            from bs4 import BeautifulSoup
+        except ImportError:
+            logger.warning("beautifulsoup4 not available for extraction")
+            return {
+                "title": "", "body": "", "published_at": None,
+                "author": None, "category": None, "is_paywall_truncated": False,
+            }
+
+        soup = BeautifulSoup(html, "html.parser")
+        json_ld = self._extract_json_ld(soup)
+
+        # --- Title ---
+        title = ""
+        if self.TITLE_CSS:
+            el = soup.select_one(self.TITLE_CSS)
+            if el:
+                title = el.get_text(strip=True)
+        if not title and self.TITLE_CSS_FALLBACK:
+            el = soup.select_one(self.TITLE_CSS_FALLBACK)
+            if el:
+                title = el.get_text(strip=True)
+        if not title:
+            title = self._extract_meta_content(soup, "og:title")
+        if not title:
+            title = json_ld.get("headline", "")
+
+        # --- Body ---
+        body = ""
+        body_el = None
+        if self.BODY_CSS:
+            body_el = soup.select_one(self.BODY_CSS)
+        if not body_el and self.BODY_CSS_FALLBACK:
+            body_el = soup.select_one(self.BODY_CSS_FALLBACK)
+        if body_el:
+            body = self._clean_body_text(body_el)
+
+        # --- Date ---
+        published_at = None
+        date_str = json_ld.get("datePublished", "")
+        if date_str:
+            published_at = self.normalize_date(date_str)
+        if not published_at and self.DATE_CSS:
+            date_el = soup.select_one(self.DATE_CSS)
+            if date_el:
+                published_at = self.normalize_date(date_el.get_text(strip=True))
+        if not published_at:
+            meta_date = self._extract_meta_content(soup, "article:published_time")
+            if meta_date:
+                published_at = self.normalize_date(meta_date)
+
+        # --- Author ---
+        author = None
+        author_data = json_ld.get("author")
+        if isinstance(author_data, dict):
+            author = author_data.get("name")
+        elif isinstance(author_data, list):
+            names = [a.get("name", "") for a in author_data if isinstance(a, dict)]
+            author = ", ".join(n for n in names if n) or None
+        if not author and self.AUTHOR_CSS:
+            author_el = soup.select_one(self.AUTHOR_CSS)
+            if author_el:
+                author = author_el.get_text(strip=True)
+
+        # --- Category ---
+        category = self._extract_category_from_url(url)
+
+        return {
+            "title": title,
+            "body": body,
+            "published_at": published_at,
+            "author": author,
+            "category": category,
+            "is_paywall_truncated": self.PAYWALL_TYPE in ("hard", "soft-metered"),
+        }
+
     def __repr__(self) -> str:
         return (
             f"<{self.__class__.__name__} "

@@ -181,13 +181,15 @@ def _make_signals_table(n: int = 2) -> pa.Table:
 
 
 def _make_topics_table(n: int = 3) -> pa.Table:
-    """Create a minimal valid TOPICS_SCHEMA table (7 columns)."""
+    """Create a minimal valid TOPICS_SCHEMA table (9 columns)."""
+    import datetime
     ids = [str(uuid.uuid4()) for _ in range(n)]
     # Cycle topic_id pattern (1, 2, 1, 2, ...) to length n
     topic_ids = [(i % 2) + 1 for i in range(n)]
     labels = ["politics" if tid == 1 else "economy" for tid in topic_ids]
     probs = [0.9 if tid == 1 else 0.8 for tid in topic_ids]
     clusters = [0 if tid == 1 else 1 for tid in topic_ids]
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
     return pa.table({
         "article_id":         pa.array(ids, type=pa.utf8()),
         "topic_id":           pa.array(topic_ids, type=pa.int32()),
@@ -196,6 +198,8 @@ def _make_topics_table(n: int = 3) -> pa.Table:
         "hdbscan_cluster_id": pa.array(clusters, type=pa.int32()),
         "nmf_topic_id":       pa.array(clusters, type=pa.int32()),
         "lda_topic_id":       pa.array(clusters, type=pa.int32()),
+        "published_at":       pa.array([now] * n, type=pa.timestamp("us", tz="UTC")),
+        "source":             pa.array(["test_source"] * n, type=pa.utf8()),
     })
 
 
@@ -814,6 +818,8 @@ def _build_full_fixture(base: Path) -> dict[str, Path]:
     })
 
     # topics.parquet
+    import datetime
+    now = datetime.datetime.now(tz=datetime.timezone.utc)
     topics = pa.table({
         "article_id":         pa.array(ids, type=pa.utf8()),
         "topic_id":           pa.array([1, 2, 1, 2, 1], type=pa.int32()),
@@ -823,6 +829,8 @@ def _build_full_fixture(base: Path) -> dict[str, Path]:
         "hdbscan_cluster_id": pa.array([0, 1, 0, 1, 0], type=pa.int32()),
         "nmf_topic_id":       pa.array([0, 1, 0, 1, 0], type=pa.int32()),
         "lda_topic_id":       pa.array([0, 1, 0, 1, 0], type=pa.int32()),
+        "published_at":       pa.array([now] * 5, type=pa.timestamp("us", tz="UTC")),
+        "source":             pa.array(["test_source"] * 5, type=pa.utf8()),
     })
 
     # embeddings.parquet

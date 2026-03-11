@@ -162,6 +162,15 @@ _NER_TAG_MAP = {
     "LOC": "location",
 }
 
+# NER quality filter constants (B3: Korean NER garbage entity prevention)
+_NER_MAX_ENTITY_LENGTH = 50  # > 50 chars = sentence fragment, not entity
+_NER_MIN_ENTITY_LENGTH = 2   # < 2 chars = noise
+_NER_MAX_NUMERIC_RATIO = 0.8  # > 80% digits = phone number/date, not entity
+# Korean sentence-ending patterns that indicate a full sentence, not an entity name
+_NER_KO_SENTENCE_ENDINGS = re.compile(
+    r'(거든|니까|습니다|됩니다|입니다|합니다|했다|겠다|된다|한다|세요|네요|어요|아요)$'
+)
+
 
 @dataclass
 class Stage2Config:
@@ -371,6 +380,39 @@ def _detect_language(text: str) -> str:
     if total_chars == 0:
         return "en"
     return "ko" if korean_chars / total_chars >= 0.10 else "en"
+
+
+def _is_valid_entity(text: str, lang: str = "en") -> bool:
+    """Deterministic quality filter for NER entities (P1 — no LLM judgment).
+
+    Rejects garbage entities produced by multilingual NER on Korean text:
+    sentence fragments, overly long strings, numeric-heavy strings.
+
+    Args:
+        text: Entity text to validate.
+        lang: Language code ("ko" for Korean-specific checks).
+
+    Returns:
+        True if entity passes quality filter.
+    """
+    if not text or len(text) < _NER_MIN_ENTITY_LENGTH:
+        return False
+    if len(text) > _NER_MAX_ENTITY_LENGTH:
+        return False
+    # Reject numeric-heavy strings (phone numbers, dates, IDs)
+    digit_count = sum(1 for c in text if c.isdigit())
+    if len(text) > 0 and digit_count / len(text) > _NER_MAX_NUMERIC_RATIO:
+        return False
+    # Korean-specific: reject sentence fragments
+    if lang == "ko":
+        # Sentence endings (verb/adjective conjugations) indicate a fragment
+        if _NER_KO_SENTENCE_ENDINGS.search(text):
+            return False
+        # Reject if text contains spaces and is longer than 20 chars
+        # (Korean entity names rarely have spaces and are short)
+        if " " in text and len(text) > 20:
+            return False
+    return True
 
 
 def _normalize_entity_name(name: str) -> str:
@@ -869,12 +911,15 @@ class NERExtractor:
         self,
         article_ids: list[str],
         texts: list[str],
+        languages: list[str] | None = None,
     ) -> dict[str, dict[str, list[str]]]:
         """Extract named entities for a batch of articles.
 
         Args:
             article_ids: Article identifiers.
             texts: Full article texts.
+            languages: Per-article language codes (e.g. "ko", "en").
+                If None, defaults to "en" for all articles.
 
         Returns:
             Dict mapping article_id -> {
@@ -884,6 +929,9 @@ class NERExtractor:
             }.
         """
         logger.info("extracting_ner", n_articles=len(article_ids), backend=self._backend)
+
+        if languages is None:
+            languages = ["en"] * len(article_ids)
 
         results: dict[str, dict[str, list[str]]] = {}
         empty_entities = {"person": [], "org": [], "location": []}
@@ -899,14 +947,15 @@ class NERExtractor:
             end = min(start + batch_size, len(article_ids))
             batch_ids = article_ids[start:end]
             batch_texts = texts[start:end]
+            batch_langs = languages[start:end]
 
-            for aid, text in zip(batch_ids, batch_texts):
+            for aid, text, lang in zip(batch_ids, batch_texts, batch_langs):
                 if not text or not text.strip():
                     results[aid] = dict(empty_entities)
                     continue
 
                 try:
-                    entities = self._extract_single(text)
+                    entities = self._extract_single(text, lang=lang)
                     results[aid] = entities
                 except Exception as exc:
                     logger.warning(
@@ -918,11 +967,12 @@ class NERExtractor:
 
         return results
 
-    def _extract_single(self, text: str) -> dict[str, list[str]]:
+    def _extract_single(self, text: str, lang: str = "en") -> dict[str, list[str]]:
         """Extract entities from a single text.
 
         Args:
             text: Article text.
+            lang: Language code for quality filtering ("ko" enables Korean filters).
 
         Returns:
             Dict with 'person', 'org', 'location' lists.
@@ -942,6 +992,9 @@ class NERExtractor:
                 word = ent.get("word", "").strip()
                 if not word or len(word) < 2:
                     continue
+                # B3: Quality filter — reject garbage entities (P1 deterministic)
+                if not _is_valid_entity(word, lang):
+                    continue
 
                 mapped_type = _NER_TAG_MAP.get(entity_group, None)
                 if mapped_type == "person":
@@ -956,6 +1009,8 @@ class NERExtractor:
             for ent in doc.ents:
                 text_val = ent.text.strip()
                 if not text_val or len(text_val) < 2:
+                    continue
+                if not _is_valid_entity(text_val, lang):
                     continue
                 if ent.label_ == "PERSON":
                     persons.append(text_val)
@@ -1222,7 +1277,7 @@ class Stage2FeatureExtractor:
         t0 = time.monotonic()
         try:
             self._ner.load()
-            ner_results = self._ner.extract_batch(article_ids, full_texts)
+            ner_results = self._ner.extract_batch(article_ids, full_texts, languages)
         except ModelLoadError:
             logger.error("ner_unavailable_using_empty")
             ner_results = {

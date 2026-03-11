@@ -201,18 +201,24 @@ def _make_topics_parquet(tmp_path, article_ids, n_topics=5):
         pa.field("hdbscan_cluster_id", pa.int32()),
         pa.field("nmf_topic_id", pa.int32()),
         pa.field("lda_topic_id", pa.int32()),
+        pa.field("published_at", pa.timestamp("us", tz="UTC")),
+        pa.field("source", pa.utf8()),
     ])
 
     topic_ids = [i % n_topics for i in range(len(article_ids))]
+    n = len(article_ids)
+    sources = ["chosun", "yna", "donga", "hani", "mk"]
     table = pa.table(
         {
             "article_id": article_ids,
             "topic_id": topic_ids,
             "topic_label": [f"Topic {t}" for t in topic_ids],
-            "topic_probability": rng.random(len(article_ids)).astype(np.float32).tolist(),
+            "topic_probability": rng.random(n).astype(np.float32).tolist(),
             "hdbscan_cluster_id": topic_ids,
             "nmf_topic_id": topic_ids,
             "lda_topic_id": topic_ids,
+            "published_at": pa.array([None] * n, type=pa.timestamp("us", tz="UTC")),
+            "source": [sources[i % len(sources)] for i in range(n)],
         },
         schema=schema,
     )
@@ -962,6 +968,8 @@ class TestStage5Integration:
             pa.field("hdbscan_cluster_id", pa.int32()),
             pa.field("nmf_topic_id", pa.int32()),
             pa.field("lda_topic_id", pa.int32()),
+            pa.field("published_at", pa.timestamp("us", tz="UTC")),
+            pa.field("source", pa.utf8()),
         ])
         topics_path = tmp_path / "analysis" / "topics.parquet"
         topics_path.parent.mkdir(parents=True, exist_ok=True)
@@ -975,6 +983,8 @@ class TestStage5Integration:
                     "hdbscan_cluster_id": pa.array([], type=pa.int32()),
                     "nmf_topic_id": pa.array([], type=pa.int32()),
                     "lda_topic_id": pa.array([], type=pa.int32()),
+                    "published_at": pa.array([], type=pa.timestamp("us", tz="UTC")),
+                    "source": [],
                 },
                 schema=schema_topics,
             ),

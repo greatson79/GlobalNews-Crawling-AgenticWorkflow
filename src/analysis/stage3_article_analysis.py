@@ -1,14 +1,12 @@
 """Stage 3: Per-Article Analysis -- sentiment, emotion, STEEPS, importance.
 
-Implements 8 analysis techniques per article:
+Implements 6 analysis techniques per article:
     T13: Sentiment Analysis (Korean) -- KoBERT
     T14: Sentiment Analysis (English) -- cardiffnlp/twitter-roberta-base-sentiment-latest
     T15: 8-Dimension Emotion (Plutchik) -- Zero-shot BART-MNLI + KcELECTRA fallback
     T16: Zero-Shot STEEPS Classification -- facebook/bart-large-mnli
-    T17: Stance Detection -- Zero-shot BART-MNLI
     T18: Social Mood Index -- Aggregation formula
     T19: Emotion Trajectory -- Rolling 7-day delta
-    T49: Narrative Extraction -- Zero-shot BART-MNLI
     --:  Importance Scoring -- Composite formula
 
 Input:
@@ -22,7 +20,7 @@ Output:
 
 Memory Budget:
     Peak ~1.8 GB (KoBERT ~500 MB + BART-MNLI ~500 MB + processing overhead)
-    Models loaded sequentially, shared BART-MNLI for emotion/STEEPS/stance/narrative.
+    Models loaded sequentially, shared BART-MNLI for emotion/STEEPS.
 
 Performance Target:
     1,000 articles in ~8.0 min
@@ -97,15 +95,6 @@ STEEPS_CODE_MAP = {
     "Political event": "P",
     "Security threat": "Se",
 }
-
-# Stance detection labels
-STANCE_LABELS = ["supportive", "critical", "neutral", "mixed"]
-
-# Narrative role labels (T49)
-NARRATIVE_LABELS = [
-    "protagonist", "antagonist", "context_setter",
-    "victim", "authority", "disruptor",
-]
 
 # Source authority tiers (configurable via sources.yaml; these are fallback
 # defaults based on site reconnaissance anti_block_tier as proxy for size/authority)
@@ -184,6 +173,32 @@ def _lazy_import_pandas():
     """Lazy import pandas."""
     import pandas as pd
     return pd
+
+
+def _detect_device() -> int | str:
+    """Detect best available device for HuggingFace pipeline.
+
+    Returns:
+        -1 for CPU, 0 for CUDA, or "mps" for Apple Silicon GPU.
+    """
+    try:
+        torch = _lazy_import_torch()
+        if hasattr(torch.backends, "mps") and torch.backends.mps.is_available():
+            # Verify MPS works with a small tensor operation
+            try:
+                t = torch.tensor([1.0], device="mps")
+                _ = t + t
+                logger.info("device_detected", device="mps")
+                return "mps"  # type: ignore[return-value]
+            except Exception:
+                pass
+        if torch.cuda.is_available():
+            logger.info("device_detected", device="cuda:0")
+            return 0
+    except ImportError:
+        pass
+    logger.info("device_detected", device="cpu")
+    return -1
 
 
 # =============================================================================
@@ -324,6 +339,9 @@ class Stage3ArticleAnalyzer:
         # Track memory for reporting
         self._memory_log: list[dict[str, Any]] = []
 
+        # Device detection (CPU / MPS / CUDA) — cached for all model loads
+        self._device = _detect_device()
+
     # -----------------------------------------------------------------
     # Model Loading
     # -----------------------------------------------------------------
@@ -355,7 +373,7 @@ class Stage3ArticleAnalyzer:
                 tokenizer=EN_SENTIMENT_MODEL_NAME,
                 max_length=MAX_TEXT_LENGTH,
                 truncation=True,
-                device=-1,  # CPU
+                device=self._device,
             )
             self._log_memory("en_sentiment_loaded")
         except Exception as e:
@@ -389,7 +407,7 @@ class Stage3ArticleAnalyzer:
                     tokenizer=KOBERT_MODEL_NAME,
                     max_length=MAX_TEXT_LENGTH,
                     truncation=True,
-                    device=-1,
+                    device=self._device,
                 )
             except Exception:
                 # Fallback: try nlptown multilingual sentiment model
@@ -405,7 +423,7 @@ class Stage3ArticleAnalyzer:
                     tokenizer=fallback_model,
                     max_length=MAX_TEXT_LENGTH,
                     truncation=True,
-                    device=-1,
+                    device=self._device,
                 )
             self._log_memory("ko_sentiment_loaded")
         except Exception as e:
@@ -420,7 +438,7 @@ class Stage3ArticleAnalyzer:
     def _load_zeroshot(self) -> None:
         """Load facebook/bart-large-mnli for zero-shot classification.
 
-        Shared across emotion, STEEPS, stance, and narrative extraction.
+        Shared across emotion and STEEPS extraction.
         Falls back to uniform defaults if unavailable.
         """
         if self._zeroshot_pipeline is not None:
@@ -431,7 +449,7 @@ class Stage3ArticleAnalyzer:
             self._zeroshot_pipeline = hf_pipeline(
                 "zero-shot-classification",
                 model=BART_MNLI_MODEL_NAME,
-                device=-1,
+                device=self._device,
             )
             self._log_memory("zeroshot_loaded")
         except Exception as e:
@@ -663,75 +681,6 @@ class Stage3ArticleAnalyzer:
         if source in finance_sources:
             return "E"
         return default_category
-
-    # -----------------------------------------------------------------
-    # Stance Detection (T17)
-    # -----------------------------------------------------------------
-
-    def _detect_stance(self, text: str) -> dict[str, float]:
-        """Detect article stance toward its subject.
-
-        Args:
-            text: Article text.
-
-        Returns:
-            Dict mapping stance label to confidence score.
-        """
-        default_stance = {s: 0.25 for s in STANCE_LABELS}
-
-        if not text or not text.strip():
-            return default_stance
-
-        if self._zeroshot_available and self._zeroshot_pipeline is not None:
-            try:
-                truncated = text[:MAX_TEXT_LENGTH * 4]
-                result = self._zeroshot_pipeline(
-                    truncated,
-                    candidate_labels=STANCE_LABELS,
-                )
-                return {
-                    label: float(score)
-                    for label, score in zip(result["labels"], result["scores"])
-                }
-            except Exception as e:
-                logger.warning("stance_detection_error", error=str(e))
-
-        return default_stance
-
-    # -----------------------------------------------------------------
-    # Narrative Extraction (T49)
-    # -----------------------------------------------------------------
-
-    def _extract_narrative(self, text: str) -> dict[str, float]:
-        """Extract narrative roles from article text via zero-shot.
-
-        Args:
-            text: Article text.
-
-        Returns:
-            Dict mapping narrative role to confidence score.
-        """
-        default_narrative = {n: round(1.0 / len(NARRATIVE_LABELS), 4) for n in NARRATIVE_LABELS}
-
-        if not text or not text.strip():
-            return default_narrative
-
-        if self._zeroshot_available and self._zeroshot_pipeline is not None:
-            try:
-                truncated = text[:MAX_TEXT_LENGTH * 4]
-                result = self._zeroshot_pipeline(
-                    truncated,
-                    candidate_labels=NARRATIVE_LABELS,
-                    multi_label=True,
-                )
-                return {
-                    label: float(score)
-                    for label, score in zip(result["labels"], result["scores"])
-                }
-            except Exception as e:
-                logger.warning("narrative_extraction_error", error=str(e))
-
-        return default_narrative
 
     # -----------------------------------------------------------------
     # Importance Scoring
@@ -1032,8 +981,7 @@ class Stage3ArticleAnalyzer:
                 "steeps_category": steeps_category,
                 "importance_score": float(importance_score),
                 # Additional columns stored internally for downstream stages
-                "_stance": self._detect_stance(analysis_text),
-                "_narrative": self._extract_narrative(analysis_text),
+                # stance/narrative removed: not persisted to output, wasted 10/24 NLI passes
                 "_emotions_dict": emotions,
                 "_source": source,
                 "_published_at": published_at,
@@ -1049,7 +997,7 @@ class Stage3ArticleAnalyzer:
         """Execute the full Stage 3 analysis pipeline.
 
         Loads input data, processes all articles through sentiment, emotion,
-        STEEPS, stance, narrative, and importance analyses, then writes
+        STEEPS, and importance analyses, then writes
         output Parquet files.
 
         Returns:

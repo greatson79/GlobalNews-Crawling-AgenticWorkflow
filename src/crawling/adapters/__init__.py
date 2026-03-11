@@ -1,11 +1,11 @@
-"""Site-specific crawling adapters for all 44 news sites.
+"""Site-specific crawling adapters for all 121 news sites.
 
 Adapter hierarchy:
     base_adapter     - Abstract base adapter interface
     kr_major/        - Korean major dailies + economy + niche (Groups A+B+C: 11 adapters)
-    kr_tech/         - Korean IT/science (Group D: 8 adapters)
-    english/         - English-language Western (Group E: 12 adapters)
-    multilingual/    - Asia-Pacific + Europe/ME (Groups F+G: 13 adapters)
+    kr_tech/         - Korean IT/science + tech (Groups C+D: 11 adapters)
+    english/         - English-language (Group E: 22 adapters)
+    multilingual/    - Asia-Pacific + Europe/ME + Africa + LatAm + Russia (Groups F-J: 77 adapters)
 
 Usage:
     from src.crawling.adapters import get_adapter

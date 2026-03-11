@@ -39,6 +39,15 @@ VALID_TEAM_STATUSES = {"partial", "all_completed"}
 # and prompt/workflow.md "Steps 4, 8, 18"
 HUMAN_STEPS = frozenset({4, 8, 18})
 
+# D-7 intentional duplication — must match _context_lib.py:_PACS_WITH_MIN_RE, _PACS_SIMPLE_RE
+# SM5c uses these to parse pACS scores from log files.
+# 2-stage parsing: (1) explicit min formula, (2) simple fallback.
+# Changing regex here requires sync with _context_lib.py PA7 logic.
+_PACS_WITH_MIN_RE = re.compile(
+    r"pACS\s*=\s*min\s*\([^)]+\)\s*=\s*(\d{1,3})", re.IGNORECASE
+)
+_PACS_SIMPLE_RE = re.compile(r"pACS\s*=\s*(\d{1,3})\b", re.IGNORECASE)
+
 # ---------------------------------------------------------------------------
 # YAML helpers (PyYAML preferred, regex fallback)
 # ---------------------------------------------------------------------------
@@ -295,8 +304,152 @@ def cmd_init(project_dir, workflow_name, total_steps):
     return {"valid": True, "sot_path": sot, "action": "initialized", "workflow_name": workflow_name}
 
 
-def cmd_advance_step(project_dir, step_num):
-    """Advance current_step from step_num to step_num+1."""
+def _check_gate_evidence(project_dir, step_num):
+    """SM5: Check quality gate evidence files before allowing step advancement.
+
+    P1 Hallucination Prevention: Makes it physically impossible to advance
+    a step without quality gate evidence, regardless of LLM behavior.
+    This is the single most critical anti-hallucination guard in the system.
+
+    Checks:
+        SM5a: verification-logs/step-N-verify.md must exist
+        SM5b: pacs-logs/step-N-pacs.md must exist
+        SM5c: pACS score must be >= 50 (RED zone blocks advancement)
+        SM5d: review-logs/step-N-review.md must not have FAIL verdict (if exists)
+
+    Returns:
+        tuple: (block_dict_or_None, warnings_list)
+        - block_dict: {"valid": False, "error": ...} if blocked, None if passed
+        - warnings: list of non-blocking warning strings (e.g., parse failures)
+    """
+    warnings = []
+
+    # SM5a: Verification log must exist
+    verify_path = os.path.join(
+        project_dir, "verification-logs", f"step-{step_num}-verify.md"
+    )
+    if not os.path.exists(verify_path):
+        return {
+            "valid": False,
+            "error": (
+                f"SM5a: verification log missing: verification-logs/step-{step_num}-verify.md. "
+                f"Run Verification Gate before advancing. Use --force to override."
+            ),
+        }, warnings
+
+    # SM5b: pACS log must exist
+    pacs_path = os.path.join(
+        project_dir, "pacs-logs", f"step-{step_num}-pacs.md"
+    )
+    if not os.path.exists(pacs_path):
+        return {
+            "valid": False,
+            "error": (
+                f"SM5b: pACS log missing: pacs-logs/step-{step_num}-pacs.md. "
+                f"Run pACS Self-Rating before advancing. Use --force to override."
+            ),
+        }, warnings
+
+    # SM5c: pACS score must not be RED (< 50)
+    # D-7: 2-stage parsing matching _context_lib.py PA7 logic exactly.
+    # Stage 1: "pACS = min(F, C, L) = 75" — explicit min formula (preferred)
+    # Stage 2: "pACS = 75" — simple fallback (no min formula)
+    try:
+        with open(pacs_path, "r", encoding="utf-8") as f:
+            pacs_content = f.read()
+        reported_pacs = None
+        min_match = _PACS_WITH_MIN_RE.search(pacs_content)
+        if min_match:
+            reported_pacs = int(min_match.group(1))
+        else:
+            simple_matches = _PACS_SIMPLE_RE.findall(pacs_content)
+            if len(simple_matches) == 1:
+                reported_pacs = int(simple_matches[0])
+        if reported_pacs is not None and reported_pacs < 50:
+            return {
+                "valid": False,
+                "error": (
+                    f"SM5c: pACS score is {reported_pacs} (RED zone < 50). "
+                    f"Rework required before advancing. Use --force to override."
+                ),
+            }, warnings
+        if reported_pacs is None:
+            # Non-blocking: ambiguous parse is not the same as confirmed RED.
+            # Multiple pACS= matches or no matches both yield None
+            # (same logic as _context_lib.py PA7).
+            warnings.append(
+                f"SM5c-warn: Could not extract pACS score from "
+                f"pacs-logs/step-{step_num}-pacs.md. RED zone check skipped."
+            )
+    except (IOError, UnicodeDecodeError):
+        warnings.append(
+            f"SM5c-warn: Could not read pacs-logs/step-{step_num}-pacs.md. "
+            f"RED zone check skipped."
+        )
+
+    # SM5d: Review verdict must not be FAIL (if review log exists)
+    review_path = os.path.join(
+        project_dir, "review-logs", f"step-{step_num}-review.md"
+    )
+    if os.path.exists(review_path):
+        try:
+            with open(review_path, "r", encoding="utf-8") as f:
+                review_content = f.read()
+            verdict_match = re.search(
+                r'Verdict\s*:\s*\*?\*?\s*(PASS|FAIL)', review_content, re.IGNORECASE
+            )
+            if verdict_match and verdict_match.group(1).upper() == "FAIL":
+                return {
+                    "valid": False,
+                    "error": (
+                        f"SM5d: Review verdict is FAIL in review-logs/step-{step_num}-review.md. "
+                        f"Address review issues before advancing. Use --force to override."
+                    ),
+                }, warnings
+        except (IOError, UnicodeDecodeError):
+            warnings.append(
+                f"SM5d-warn: Could not read review-logs/step-{step_num}-review.md. "
+                f"Review verdict check skipped."
+            )
+
+    return None, warnings  # All quality gate evidence checks passed
+
+
+def _log_force_audit(project_dir, step_num):
+    """H3: Write audit record when --force bypasses SM5 quality gates.
+
+    Creates an append-only audit trail in autopilot-logs/ so every
+    --force usage is traceable. Best-effort — failure does not block advance.
+    """
+    import datetime
+    try:
+        log_dir = os.path.join(project_dir, "autopilot-logs")
+        os.makedirs(log_dir, exist_ok=True)
+        audit_path = os.path.join(log_dir, "sm5-force-audit.jsonl")
+        entry = json.dumps({
+            "step": step_num,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "action": "SM5 gate bypass via --force",
+        }, ensure_ascii=False)
+        with open(audit_path, "a", encoding="utf-8") as f:
+            f.write(entry + "\n")
+    except Exception:
+        pass  # Audit failure must not block step advancement
+
+
+def cmd_advance_step(project_dir, step_num, force=False):
+    """Advance current_step from step_num to step_num+1.
+
+    P1 Hallucination Prevention (SM5): For non-human steps, quality gate
+    evidence files must exist before advancement is allowed. This makes it
+    physically impossible for the LLM to skip quality gates.
+
+    Use force=True only when the user explicitly instructs override.
+
+    Check ordering: CR-1 → MD-1 → SM3 → SM4 → SM4b → SM5 → advance.
+    SM5 runs inside lock after SOT validation to ensure correct error messages
+    (e.g., invalid step_num yields CR-1 error, not SM5 file-not-found).
+    """
     try:
         sot = _sot_path(project_dir)
         with _SOTLock(sot, exclusive=True):
@@ -342,16 +495,32 @@ def cmd_advance_step(project_dir, step_num):
                     "error": f"SM4b: Output file does not exist: {output_path}",
                 }
 
+            # SM5: Quality gate evidence (non-human steps only)
+            # P1 hallucination prevention: LLM cannot advance without gate evidence.
+            # Runs inside lock after CR-1/SM3/SM4 to ensure correct error ordering.
+            # Local file I/O only (~100μs) — lock duration impact is negligible.
+            sm5_warnings = []
+            if step_num not in HUMAN_STEPS and not force:
+                gate_block, sm5_warnings = _check_gate_evidence(project_dir, step_num)
+                if gate_block:
+                    return gate_block
+
             # Advance
             wf["current_step"] = step_num + 1
             _write_sot_atomic(sot, data)
 
-            return {
+            result = {
                 "valid": True,
                 "action": "advanced",
                 "previous_step": step_num,
                 "current_step": step_num + 1,
             }
+            if force and step_num not in HUMAN_STEPS:
+                result["warning"] = "SM5 quality gate checks bypassed via --force"
+                _log_force_audit(project_dir, step_num)
+            if sm5_warnings:
+                result["sm5_warnings"] = sm5_warnings
+            return result
     except Exception as e:
         return {"valid": False, "error": str(e)}
 
@@ -758,6 +927,9 @@ def main():
     parser.add_argument("--set-status", metavar="STATUS", help="Set workflow status (in_progress, completed, failed, etc.)")
     parser.add_argument("--set-autopilot", metavar="BOOL", help="Set autopilot enabled (true/false)")
     parser.add_argument("--add-auto-approved", type=int, metavar="STEP", help="Record a human step as auto-approved")
+    parser.add_argument("--force", action="store_true",
+                        help="Force advance step — bypass SM5 quality gate evidence checks. "
+                             "Use ONLY when the user explicitly instructs override.")
 
     args = parser.parse_args()
 
@@ -766,7 +938,7 @@ def main():
     elif args.init:
         result = cmd_init(args.project_dir, args.workflow_name, args.total_steps)
     elif args.advance_step is not None:
-        result = cmd_advance_step(args.project_dir, args.advance_step)
+        result = cmd_advance_step(args.project_dir, args.advance_step, force=args.force)
     elif args.record_output:
         step = int(args.record_output[0])
         path = args.record_output[1]

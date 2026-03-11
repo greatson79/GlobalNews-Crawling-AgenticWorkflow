@@ -10,7 +10,7 @@ Tiers:
     T3 - Headless browser: Playwright/Patchright for JS rendering
     T4 - Fingerprint stealth: Patchright + randomized canvas/WebGL/fonts
     T5 - Proxy rotation: Switch to next proxy in the configured pool
-    T6 - Human escalation: Log failure, pause domain, alert for manual review
+    T6 - Never-Abandon Persistence: DynamicBypassEngine strategy dispatch + TotalWar fallback
 
 Reference: Step 5 Architecture Blueprint, Anti-Block System.
 Reference: Step 6 Crawling Strategies, per-site tier assignments.
@@ -50,7 +50,7 @@ class EscalationTier(IntEnum):
     T3_BROWSER = 3
     T4_FINGERPRINT = 4
     T5_PROXY = 5
-    T6_HUMAN = 6
+    T6_NEVER_ABANDON = 6
 
 
 @dataclass
@@ -210,10 +210,17 @@ TIER_STRATEGIES: dict[int, TierStrategy] = {
     ),
     6: TierStrategy(
         tier=6,
-        name="Human Escalation",
-        min_delay=0.0,
-        max_delay=0.0,
-        description="Log failure and pause domain for manual analysis.",
+        name="Never-Abandon Persistence (크롤링 절대 원칙)",
+        min_delay=30.0,
+        max_delay=120.0,
+        requires_browser=True,
+        requires_proxy=True,
+        requires_fingerprint=True,
+        description=(
+            "Maximum escalation with ALL countermeasures active. "
+            "Cycles through alternative sources (RSS, Google Cache, AMP). "
+            "NEVER surrenders -- keeps retrying with different approaches."
+        ),
     ),
 }
 
@@ -400,7 +407,7 @@ class AntiBlockEngine:
         # Decide whether to escalate
         should_escalate = (
             profile.consecutive_failures >= _ESCALATION_FAILURE_THRESHOLD
-            and profile.current_tier < EscalationTier.T6_HUMAN
+            and profile.current_tier < EscalationTier.T6_NEVER_ABANDON
         )
 
         # Fast-track escalation: if the diagnosis recommends a higher tier, jump there
@@ -417,8 +424,8 @@ class AntiBlockEngine:
             # Escalate to the higher of current+1 or the recommended tier
             new_tier = profile.current_tier + 1
             if diagnosis and diagnosis.recommended_tier > new_tier:
-                new_tier = min(diagnosis.recommended_tier, EscalationTier.T6_HUMAN)
-            new_tier = min(new_tier, EscalationTier.T6_HUMAN)
+                new_tier = min(diagnosis.recommended_tier, EscalationTier.T6_NEVER_ABANDON)
+            new_tier = min(new_tier, EscalationTier.T6_NEVER_ABANDON)
 
             profile.current_tier = new_tier
             profile.consecutive_failures = 0
@@ -544,8 +551,8 @@ class AntiBlockEngine:
     # Convenience Methods
     # -------------------------------------------------------------------------
 
-    def is_paused(self, site_id: str) -> bool:
-        """Check if a site has reached Tier 6 (human escalation / paused).
+    def is_at_max_escalation(self, site_id: str) -> bool:
+        """Check if a site has reached Tier 6 (Never-Abandon persistence loop).
 
         Args:
             site_id: Unique site identifier.
@@ -554,7 +561,7 @@ class AntiBlockEngine:
             True if the site is at Tier 6.
         """
         profile = self.get_profile(site_id)
-        return profile.current_tier >= EscalationTier.T6_HUMAN
+        return profile.current_tier >= EscalationTier.T6_NEVER_ABANDON
 
     def reset_site(self, site_id: str) -> None:
         """Reset a site back to Tier 1 (e.g., after manual intervention).
@@ -571,15 +578,15 @@ class AntiBlockEngine:
         self._save_profiles()
         logger.info("Site reset to Tier 1", extra={"site_id": site_id})
 
-    def get_all_paused_sites(self) -> list[str]:
-        """Get all sites currently at Tier 6 (paused for human analysis).
+    def get_all_max_escalation_sites(self) -> list[str]:
+        """Get all sites currently at Tier 6 (Never-Abandon persistence loop).
 
         Returns:
             List of site IDs at Tier 6.
         """
         return [
             sid for sid, profile in self.profiles.items()
-            if profile.current_tier >= EscalationTier.T6_HUMAN
+            if profile.current_tier >= EscalationTier.T6_NEVER_ABANDON
         ]
 
     def get_statistics(self) -> dict[str, Any]:
@@ -602,7 +609,7 @@ class AntiBlockEngine:
             "total_blocks": total_blocks,
             "total_successes": total_successes,
             "block_rate": total_blocks / max(total_blocks + total_successes, 1),
-            "paused_sites": self.get_all_paused_sites(),
+            "paused_sites": self.get_all_max_escalation_sites(),
         }
 
     # -------------------------------------------------------------------------
@@ -651,5 +658,5 @@ class AntiBlockEngine:
     def __repr__(self) -> str:
         return (
             f"AntiBlockEngine(sites={len(self.profiles)}, "
-            f"paused={len(self.get_all_paused_sites())})"
+            f"paused={len(self.get_all_max_escalation_sites())})"
         )

@@ -25,64 +25,48 @@ import sys
 # Constants — Step configuration
 # ---------------------------------------------------------------------------
 
-# Steps that require review (L2) — from workflow.md
-REVIEW_STEPS = {1, 3, 5, 7, 16, 19, 20}
+# Steps that require review (L2) — from workflow.md "Review:" field annotations
+# D-7 cross-reference: must match prompt/workflow.md steps with "Review: @reviewer|@fact-checker"
+# Steps 19 (doc-writer) and 20 (reviewer itself) do NOT have Review: field → excluded
+REVIEW_STEPS = frozenset({1, 3, 5, 7, 16})
 
 # D-7 intentional duplication — must match sot_manager.py:HUMAN_STEPS,
 # validate_step_transition.py:HUMAN_STEPS, _context_lib.py:HUMAN_STEPS_SET,
 # and prompt/workflow.md "Steps 4, 8, 18"
 HUMAN_STEPS = frozenset({4, 8, 18})
 
-# Steps that require translation — from workflow.md
-# D-7 cross-reference: must match ORCHESTRATOR-PLAYBOOK.md Step-Type Quick Map "Translation" column
-TRANSLATION_STEPS = {1, 3, 5, 7, 16, 19, 20}
+# Steps that require translation — from workflow.md "Translation: @translator" annotations
+# D-7 cross-reference: must match prompt/workflow.md steps with "Translation: @translator"
+# Steps 2,6,9-15,17 explicitly marked "Translation: none (code/technical)" → excluded
+# Step 20 has no Translation field → excluded (final code review output)
+TRANSLATION_STEPS = frozenset({1, 3, 5, 7, 16, 19})
 
 # Steps executed by agent teams — from workflow.md "(team)" annotations
 # D-7 cross-reference: must match prompt/workflow.md Step-Type Quick Map "(team)" column
 TEAM_STEPS = frozenset({2, 6, 10, 11, 13, 14})
 
-# Pre/post processing scripts per step
+# Pre/post processing scripts per step (all 20 steps registered for consistency)
 STEP_SCRIPTS = {
-    1: {
-        "pre": ["scripts/extract_site_urls.py"],
-        "post": ["scripts/generate_sources_yaml_draft.py"],
-    },
-    3: {
-        "pre": ["scripts/merge_recon_and_deps.py"],
-        "post": [],
-    },
-    5: {
-        "pre": ["scripts/filter_prd_architecture.py"],
-        "post": ["scripts/validate_data_schema.py"],
-    },
-    6: {
-        "pre": ["scripts/split_sites_by_group.py"],
-        "post": ["scripts/validate_site_coverage.py"],
-    },
-    7: {
-        "pre": ["scripts/filter_prd_analysis.py"],
-        "post": [],
-    },
-    10: {
-        "pre": ["scripts/extract_architecture_crawling.py"],
-        "post": [],
-    },
-    11: {
-        "pre": ["scripts/distribute_sites_to_teams.py"],
-        "post": ["scripts/verify_adapter_coverage.py"],
-    },
-    13: {
-        "pre": ["scripts/extract_pipeline_design_s1_s4.py"],
-        "post": [],
-    },
-    14: {
-        "pre": ["scripts/extract_pipeline_design_s5_s8.py"],
-        "post": [],
-    },
-    16: {
-        "pre": [],
-        "post": ["scripts/calculate_success_metrics.py"],
-    },
+    1:  {"pre": ["scripts/extract_site_urls.py"],            "post": ["scripts/generate_sources_yaml_draft.py"]},
+    2:  {"pre": [],                                          "post": []},   # (team) — delegation by Team Lead
+    3:  {"pre": ["scripts/merge_recon_and_deps.py"],         "post": []},
+    4:  {"pre": [],                                          "post": []},   # (human) — manual review
+    5:  {"pre": ["scripts/filter_prd_architecture.py"],      "post": ["scripts/validate_data_schema.py"]},
+    6:  {"pre": ["scripts/split_sites_by_group.py"],         "post": ["scripts/validate_site_coverage.py"]},
+    7:  {"pre": ["scripts/filter_prd_analysis.py"],          "post": []},
+    8:  {"pre": [],                                          "post": []},   # (human) — architecture approval
+    9:  {"pre": [],                                          "post": ["scripts/validate_code_structure.py"]},
+    10: {"pre": ["scripts/extract_architecture_crawling.py"],"post": []},
+    11: {"pre": ["scripts/distribute_sites_to_teams.py"],    "post": ["scripts/verify_adapter_coverage.py"]},
+    12: {"pre": [],                                          "post": []},   # integration — manual pipeline wiring
+    13: {"pre": ["scripts/extract_pipeline_design_s1_s4.py"],"post": []},
+    14: {"pre": ["scripts/extract_pipeline_design_s5_s8.py"],"post": []},
+    15: {"pre": [],                                          "post": []},   # integration — manual pipeline testing
+    16: {"pre": [],                                          "post": ["scripts/calculate_success_metrics.py"]},
+    17: {"pre": [],                                          "post": []},   # automation — scripts/configs
+    18: {"pre": [],                                          "post": []},   # (human) — final approval
+    19: {"pre": [],                                          "post": []},   # documentation — manual writing
+    20: {"pre": [],                                          "post": []},   # code review — @reviewer output
 }
 
 
@@ -475,7 +459,8 @@ def main():
                         help="Deprecated — HQ gates now auto-detect from SOT. Kept for backward compat.")
     args = parser.parse_args()
 
-    check_review = args.check_review and not args.skip_review
+    # Auto-activate L2 for REVIEW_STEPS unless explicitly skipped
+    check_review = (args.check_review or args.step in REVIEW_STEPS) and not args.skip_review
     result = check_quality_gates(args.project_dir, args.step, check_review)
     print(json.dumps(result, ensure_ascii=False, indent=2))
 

@@ -62,7 +62,8 @@ SIGNALS_EXPECTED = [
 TOPICS_EXPECTED = [
     "article_id", "topic_id", "topic_label", "topic_probability",
     "hdbscan_cluster_id", "nmf_topic_id", "lda_topic_id",
-]  # 7 columns — src/storage/parquet_writer.py:TOPICS_PA_SCHEMA
+    "published_at", "source",
+]  # 9 columns — src/storage/parquet_writer.py:TOPICS_PA_SCHEMA
 
 TIMESERIES_EXPECTED = [
     "series_id", "topic_id", "metric_type", "date", "value",

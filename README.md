@@ -1,6 +1,6 @@
 # GlobalNews — 뉴스 크롤링 & 빅데이터 분석 시스템
 
-> **44개 국제 뉴스 사이트 자동 수집 → 56개 NLP 분석 기법 → 5-Layer 신호 분류 → Parquet/SQLite 출력**
+> **121개 국제 뉴스 사이트 자동 수집 → 56개 NLP 분석 기법 → 5-Layer 신호 분류 → Parquet/SQLite 출력**
 
 | 항목 | 내용 |
 |------|------|
@@ -8,7 +8,7 @@
 | **산출물** | Parquet (ZSTD) + SQLite (FTS5/vec) + Streamlit 대시보드 |
 | **실행 환경** | MacBook M2 Pro, 48GB RAM, Claude API $0 |
 | **상태** | Production-Ready — 20/20 단계 완료 |
-| **코드 규모** | 91개 Python 모듈, ~41,500 LOC (src) + ~22,000 LOC (tests) |
+| **코드 규모** | 93개 Python 모듈, ~42,200 LOC (src) + ~22,350 LOC (tests) |
 
 ---
 
@@ -55,17 +55,20 @@ python3 main.py --mode crawl --groups A,B              # 특정 그룹만
 
 ## 시스템 개요
 
-### 44개 뉴스 사이트 (7개 그룹, 9개 언어)
+### 121개 뉴스 사이트 (10개 그룹, 14+ 언어)
 
 | 그룹 | 지역 | 사이트 수 | 예시 |
 |------|------|----------|------|
 | A | 한국 주요 일간지 | 5 | 조선, 중앙, 동아, 한겨레, 연합 |
 | B | 한국 경제지 | 4 | 매경, 한경, 파이낸셜, 머니투데이 |
 | C | 한국 니치 | 3 | 노컷, 국민, 오마이 |
-| D | 한국 IT/과학 | 7 | 38North, Bloter, ZDNet, 전자신문 등 |
-| E | 영어/미국 | 12 | NYT, FT, WSJ, CNN, Bloomberg 등 |
-| F | 아시아-태평양 | 6 | People's Daily, SCMP, Yomiuri, TheHindu 등 |
-| G | 유럽/중동 | 7 | TheSun, Bild, LeMonde, AlJazeera 등 |
+| D | 한국 IT/과학 | 10 | 38North, Bloter, ZDNet, 전자신문, Insight 등 |
+| E | 영어권 | 22 | NYT, FT, WSJ, CNN, Bloomberg, BBC, Guardian 등 |
+| F | 아시아-태평양 | 23 | SCMP, Yomiuri, TheHindu, Inquirer, VNExpress 등 |
+| G | 유럽/중동 | 38 | Spiegel, LeMonde, Corriere, AlJazeera, Haaretz 등 |
+| H | 아프리카 | 4 | AllAfrica, Africanews, TheAfricaReport, Panapress |
+| I | 라틴 아메리카 | 8 | Clarin, Folha, ElMercurio, ElTiempo 등 |
+| J | 러시아/중앙아시아 | 4 | RIA, RG, RBC, GoGo Mongolia |
 
 ### 8단계 NLP 분석 파이프라인 (56개 분석 기법)
 
@@ -99,14 +102,14 @@ GlobalNews-Crawling-AgenticWorkflow/
 ├── main.py                      ← CLI 진입점 (crawl/analyze/full/status)
 ├── dashboard.py                 ← Streamlit 대시보드 (6개 탭)
 │
-├── src/                         ← 핵심 소스 코드 (91개 모듈, ~41,500 LOC)
-│   ├── crawling/                ← 크롤링 엔진 (44개 어댑터 + 안티블록 + 페이월 바이패스)
+├── src/                         ← 핵심 소스 코드 (93개 모듈, ~42,200 LOC)
+│   ├── crawling/                ← 크롤링 엔진 (121개 어댑터 + 안티블록 + DynamicBypassEngine + 페이월 바이패스)
 │   ├── analysis/                ← 8단계 NLP 파이프라인
 │   ├── storage/                 ← Parquet + SQLite I/O
 │   └── utils/                   ← 로깅, 설정, 에러 처리
 │
 ├── config/                      ← 설정 파일
-│   ├── sources.yaml             (44개 사이트)
+│   ├── sources.yaml             (121개 사이트)
 │   ├── review-focus.yaml        (단계별 리뷰 집중 영역 — Framework config)
 │   ├── output-structure.yaml    (단계별 산출물 구조 패턴 — Framework config)
 │   └── crontab.txt              (cron 설정 템플릿)
@@ -118,7 +121,7 @@ GlobalNews-Crawling-AgenticWorkflow/
 │   └── output/YYYY-MM-DD/       (최종 출력: Parquet + SQLite)
 │
 ├── scripts/                     ← 운영 스크립트 (28개)
-├── tests/                       ← 테스트 (40개 파일, ~2,028 테스트)
+├── tests/                       ← 테스트 (45개 파일, ~2,547 테스트)
 │
 ├── GLOBALNEWS-README.md                       ← 시스템 상세 소개
 ├── GLOBALNEWS-ARCHITECTURE-AND-PHILOSOPHY.md  ← 설계 철학 + 아키텍처 심층
@@ -140,7 +143,7 @@ GlobalNews-Crawling-AgenticWorkflow/
 |------|-----|
 | 수집 기사 | 1,286건 (raw JSONL) |
 | 처리 기사 | 1,103건 (중복 제거 후) |
-| 성공 소스 | 24/44 사이트 |
+| 성공 소스 | 24/44 사이트 (44-site 설정 기준) |
 | 토픽 발견 | 44개 토픽 |
 | 분석 컬럼 | 21개 (감성, 감정 8차원, STEEPS, 중요도 등) |
 | 출력 크기 | analysis.parquet 2.3MB + index.sqlite 6.0MB |
@@ -189,13 +192,13 @@ df.groupby('topic_label')['sentiment_score'].mean().sort_values()
 |-------------|---------------------|
 | 3단계 구조 | Research (4) → Planning (4) → Implementation (12) |
 | SOT 패턴 | `.claude/state.yaml` — Orchestrator만 쓰기 |
-| 5계층 QA | L0(a-d) Anti-Skip → Pre-L1 /simplify → L1 Verification → L1.5 pACS → L2 Review(+Focus) |
-| P1 봉쇄 | 11개 결정론적 검증 스크립트 + 336개 P1 Layer 3 테스트 |
+| 5계층 QA + SM5 | L0(a-d) Anti-Skip → Pre-L1 /simplify → L1 Verification → L1.5 pACS → L2 Review(+Focus) + SM5 SOT-Level 강제 |
+| P1 봉쇄 | 12개 결정론적 검증 스크립트 + SM5 gate evidence guard + 353개 P1 Layer 3 테스트 |
 | 전문가 위임 | 32개 전문 서브에이전트, 6개 에이전트 팀 |
 | Safety Hooks | 위험 명령·시크릿·SQL 차단(exit 2) + 시크릿 출력 감지(경고) + TDD 보호 + 예측적 디버깅 |
 | Context Preservation | 스냅샷 + Knowledge Archive + RLM 복원 + Learned Patterns 표면화 + Phase-Aware Compact + Retry Progress Circuit Breaker |
 
-**도메인 고유 변이**: 4-Level 재시도 (90회, Circuit Breaker 무진전 감지 포함), 44-site Adapter Pattern, 5-Layer Signal Hierarchy, Date-Partitioned Storage, HQ Gates (4종 Human-step 품질 검증), Paywall Bypass System (BrowserRenderer + AdaptiveExtractor + is_paywall_body 영어/프랑스어 26패턴)
+**도메인 고유 변이**: 4-Level 재시도 (90회, Circuit Breaker 무진전 감지 포함), 121-site Adapter Pattern (10 Groups, A-J), DynamicBypassEngine (12전략, 5-Tier, 7 BlockTypes) + Never-Abandon 루프, 5-Layer Signal Hierarchy, Date-Partitioned Storage, HQ Gates (4종 Human-step 품질 검증), Paywall Bypass System (BrowserRenderer + AdaptiveExtractor + is_paywall_body 영어/프랑스어 26패턴), SM5 Quality Gate Evidence Guard, P1 사이트 레지스트리 교차 검증
 
 ---
 
@@ -217,14 +220,14 @@ df.groupby('topic_label')['sentiment_score'].mean().sort_values()
 | [AGENTICWORKFLOW-ARCHITECTURE-AND-PHILOSOPHY.md](AGENTICWORKFLOW-ARCHITECTURE-AND-PHILOSOPHY.md) | 프레임워크 설계 철학 |
 | [AGENTICWORKFLOW-USER-MANUAL.md](AGENTICWORKFLOW-USER-MANUAL.md) | 프레임워크 사용 매뉴얼 |
 | [soul.md](soul.md) | DNA 유전 철학 |
-| [DECISION-LOG.md](DECISION-LOG.md) | 설계 결정 로그 (ADR-001~048) |
+| [DECISION-LOG.md](DECISION-LOG.md) | 설계 결정 로그 (ADR-001~063) |
 
 ---
 
 ## 테스트
 
 ```bash
-pytest                      # 전체 2,028 테스트
+pytest                      # 전체 ~2,547 테스트
 pytest -m unit              # 단위 테스트
 pytest -m "not slow"        # NLP 모델 로딩 제외 (빠른 실행)
 ```

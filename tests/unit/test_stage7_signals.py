@@ -227,6 +227,8 @@ def minimal_topics_parquet(tmp_path):
         "topic_id": pa.array([0, 0, 1, 1, 1], type=pa.int32()),
         "topic_label": pa.array(["Topic A", "Topic A", "Topic B", "Topic B", "Topic B"], type=pa.utf8()),
         "topic_probability": pa.array([0.8, 0.7, 0.9, 0.85, 0.75], type=pa.float32()),
+        "published_at": pa.array([None, None, None, None, None], type=pa.timestamp("us", tz="UTC")),
+        "source": pa.array(["chosun", "yna", "donga", "hani", "mk"], type=pa.utf8()),
     })
     pq.write_table(table, str(analysis_dir / "topics.parquet"))
     return analysis_dir
@@ -1161,12 +1163,20 @@ class TestPipelineIntegration:
         topic_ids = [i % n_topics for i in range(n_articles)]
         labels = [f"Topic {tid}" for tid in topic_ids]
 
+        sources = ["chosun", "yna", "donga", "hani", "mk"]
         table = pa.table({
             "article_id": pa.array(article_ids, type=pa.utf8()),
             "topic_id": pa.array(topic_ids, type=pa.int32()),
             "topic_label": pa.array(labels, type=pa.utf8()),
             "topic_probability": pa.array(
                 [0.8] * n_articles, type=pa.float32()
+            ),
+            "published_at": pa.array(
+                [None] * n_articles, type=pa.timestamp("us", tz="UTC")
+            ),
+            "source": pa.array(
+                [sources[i % len(sources)] for i in range(n_articles)],
+                type=pa.utf8(),
             ),
         })
         pq.write_table(table, str(analysis_dir / "topics.parquet"))

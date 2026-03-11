@@ -36,69 +36,213 @@ except ImportError:
 
 
 # ---------------------------------------------------------------------------
-# Constants — default site catalog
+# Constants — fallback site catalog (used when runtime SOT unavailable)
 # ---------------------------------------------------------------------------
 
-# Canonical 44-site catalog — MUST match adapter agent definitions:
-#   .claude/agents/adapter-dev-kr-major.md      (11 sites)
-#   .claude/agents/adapter-dev-kr-tech.md       (8 sites)
-#   .claude/agents/adapter-dev-english.md       (12 sites)
-#   .claude/agents/adapter-dev-multilingual.md  (13 sites)
-_DEFAULT_SITES: list[dict[str, Any]] = [
-    # Korean major — Group A: Major Dailies (5)
-    {"domain": "chosun.com", "name": "Chosun Ilbo", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "joongang.co.kr", "name": "JoongAng Ilbo", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "donga.com", "name": "Dong-A Ilbo", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "hani.co.kr", "name": "Hankyoreh", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "yna.co.kr", "name": "Yonhap News", "language": "ko", "crawl_method": "rss+api", "anti_block_tier": 2},
-    # Korean major — Group B: Economy (4)
-    {"domain": "mk.co.kr", "name": "Maeil Business", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "hankyung.com", "name": "Korea Economic Daily", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "fnnews.com", "name": "Financial News", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "mt.co.kr", "name": "Money Today", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    # Korean major — Group C: Niche (2)
-    {"domain": "nocutnews.co.kr", "name": "NoCut News", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "kmib.co.kr", "name": "Kookmin Ilbo", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    # Korean tech — Group D (8)
-    {"domain": "zdnet.co.kr", "name": "ZDNet Korea", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "itworld.co.kr", "name": "IT World Korea", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "bloter.net", "name": "Bloter", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "etnews.com", "name": "Electronic Times", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "ddaily.co.kr", "name": "Digital Daily", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "aitimes.com", "name": "AI Times", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    {"domain": "techm.kr", "name": "TechM", "language": "ko", "crawl_method": "html", "anti_block_tier": 1},
-    {"domain": "byline.network", "name": "Byline Network", "language": "ko", "crawl_method": "rss+html", "anti_block_tier": 1},
-    # English (12)
-    {"domain": "reuters.com", "name": "Reuters", "language": "en", "crawl_method": "rss+api", "anti_block_tier": 3},
-    {"domain": "apnews.com", "name": "AP News", "language": "en", "crawl_method": "rss+api", "anti_block_tier": 2},
-    {"domain": "wsj.com", "name": "Wall Street Journal", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 3},
-    {"domain": "nytimes.com", "name": "New York Times", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 3},
-    {"domain": "washingtonpost.com", "name": "Washington Post", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 3},
-    {"domain": "ft.com", "name": "Financial Times", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 3},
-    {"domain": "economist.com", "name": "The Economist", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 3},
-    {"domain": "bbc.com", "name": "BBC News", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "theguardian.com", "name": "The Guardian", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "cnn.com", "name": "CNN", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 3},
-    {"domain": "aljazeera.com", "name": "Al Jazeera English", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "bloomberg.com", "name": "Bloomberg", "language": "en", "crawl_method": "rss+html", "anti_block_tier": 3},
-    # Multilingual — CJK Japanese (3)
-    {"domain": "nhk.or.jp", "name": "NHK News Web", "language": "ja", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "asahi.com", "name": "Asahi Shimbun", "language": "ja", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "nikkei.com", "name": "Nikkei", "language": "ja", "crawl_method": "rss+html", "anti_block_tier": 3},
-    # Multilingual — CJK Chinese (3)
-    {"domain": "xinhuanet.com", "name": "Xinhua News", "language": "zh", "crawl_method": "html", "anti_block_tier": 2},
-    {"domain": "scmp.com", "name": "South China Morning Post", "language": "zh", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "caixin.com", "name": "Caixin", "language": "zh", "crawl_method": "html", "anti_block_tier": 2},
-    # Multilingual — RTL Arabic (2)
-    {"domain": "aljazeera.net", "name": "Al Jazeera Arabic", "language": "ar", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "alarabiya.net", "name": "Al Arabiya", "language": "ar", "crawl_method": "rss+html", "anti_block_tier": 2},
-    # Multilingual — European (5)
-    {"domain": "lemonde.fr", "name": "Le Monde", "language": "fr", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "spiegel.de", "name": "Der Spiegel", "language": "de", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "elpais.com", "name": "El Pais", "language": "es", "crawl_method": "rss+html", "anti_block_tier": 2},
-    {"domain": "tass.com", "name": "TASS", "language": "ru", "crawl_method": "html", "anti_block_tier": 2},
-    {"domain": "afp.com", "name": "Agence France-Presse", "language": "fr", "crawl_method": "rss+html", "anti_block_tier": 2},
+# Fallback catalog — used only when data/config/sources.yaml is missing.
+# P1: Normal operation derives sites from runtime SOT programmatically
+# via _derive_sites_from_sot(), preventing hardcoded list desync.
+_FALLBACK_SITES: list[dict[str, Any]] = [
+    # Group A: Korean Major Dailies (5)
+    {"domain": "chosun.com", "name": "Chosun Ilbo", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "joongang.co.kr", "name": "JoongAng Ilbo", "language": "ko", "crawl_method": "dom+sitemap", "anti_block_tier": 3},
+    {"domain": "donga.com", "name": "Dong-A Ilbo", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "hani.co.kr", "name": "Hankyoreh", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "yna.co.kr", "name": "Yonhap News Agency", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    # Group B: Korean Economy (4)
+    {"domain": "mk.co.kr", "name": "Maeil Business Newspaper", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "hankyung.com", "name": "Korea Economic Daily", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "fnnews.com", "name": "Financial News", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "mt.co.kr", "name": "Money Today", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    # Group C: Korean Niche (3)
+    {"domain": "nocutnews.co.kr", "name": "NoCut News", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "kmib.co.kr", "name": "Kookmin Ilbo", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "ohmynews.com", "name": "OhmyNews", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    # Group D: Korean Tech & Niche English (10)
+    {"domain": "38north.org", "name": "38 North", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "bloter.net", "name": "Bloter", "language": "ko", "crawl_method": "playwright+rss", "anti_block_tier": 3},
+    {"domain": "etnews.com", "name": "Electronic Times", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "sciencetimes.co.kr", "name": "Science Times", "language": "ko", "crawl_method": "sitemap+rss", "anti_block_tier": 3},
+    {"domain": "zdnet.co.kr", "name": "ZDNet Korea", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "irobotnews.com", "name": "iRobot News", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "techneedle.com", "name": "TechNeedle", "language": "ko", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "insight.co.kr", "name": "Insight Korea", "language": "ko", "crawl_method": "rss+dom", "anti_block_tier": 2},
+    {"domain": "stratechery.com", "name": "Stratechery", "language": "en", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    {"domain": "techmeme.com", "name": "Techmeme", "language": "en", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    # Group E: English Major & Western (22)
+    {"domain": "marketwatch.com", "name": "MarketWatch", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "voakorea.com", "name": "VOA Korea", "language": "ko", "crawl_method": "api+sitemap", "anti_block_tier": 1},
+    {"domain": "huffpost.com", "name": "HuffPost", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 2},
+    {"domain": "nytimes.com", "name": "The New York Times", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 3},
+    {"domain": "ft.com", "name": "Financial Times", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 3},
+    {"domain": "wsj.com", "name": "Wall Street Journal", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 3},
+    {"domain": "latimes.com", "name": "Los Angeles Times", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "buzzfeed.com", "name": "BuzzFeed", "language": "en", "crawl_method": "playwright+sitemap", "anti_block_tier": 3},
+    {"domain": "nationalpost.com", "name": "National Post", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "edition.cnn.com", "name": "CNN", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 2},
+    {"domain": "bloomberg.com", "name": "Bloomberg", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 3},
+    {"domain": "afmedios.com", "name": "AF Medios", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "wired.com", "name": "Wired", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "investing.com", "name": "Investing.com", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "qz.com", "name": "Quartz", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "bbc.com", "name": "BBC News", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "theguardian.com", "name": "The Guardian", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "thetimes.com", "name": "The Times", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 3},
+    {"domain": "telegraph.co.uk", "name": "The Telegraph", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 3},
+    {"domain": "politico.eu", "name": "Politico Europe", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "euractiv.com", "name": "Euractiv", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "natureasia.com", "name": "Nature Asia", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    # Group F: Asia-Pacific (23)
+    {"domain": "people.com.cn", "name": "People's Daily", "language": "zh", "crawl_method": "sitemap+dom", "anti_block_tier": 2},
+    {"domain": "globaltimes.cn", "name": "Global Times", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 1},
+    {"domain": "scmp.com", "name": "South China Morning Post", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "taiwannews.com.tw", "name": "Taiwan News", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 1},
+    {"domain": "yomiuri.co.jp", "name": "Yomiuri Shimbun", "language": "ja", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "thehindu.com", "name": "The Hindu", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "mainichi.jp", "name": "Mainichi Shimbun", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "asahi.com", "name": "Asahi Shimbun", "language": "ja", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "news.yahoo.co.jp", "name": "Yahoo Japan News", "language": "ja", "crawl_method": "rss+dom", "anti_block_tier": 3},
+    {"domain": "timesofindia.indiatimes.com", "name": "Times of India", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "hindustantimes.com", "name": "Hindustan Times", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "economictimes.indiatimes.com", "name": "Economic Times India", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "indianexpress.com", "name": "Indian Express", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "philstar.com", "name": "PhilStar", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "mb.com.ph", "name": "Manila Bulletin", "language": "en", "crawl_method": "rss+dom", "anti_block_tier": 3},
+    {"domain": "inquirer.net", "name": "Philippine Daily Inquirer", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "thejakartapost.com", "name": "The Jakarta Post", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "en.antaranews.com", "name": "Antara News", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "en.tempo.co", "name": "Tempo Indonesia", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "focustaiwan.tw", "name": "Focus Taiwan", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "taipeitimes.com", "name": "Taipei Times", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "e.vnexpress.net", "name": "VnExpress International", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "vietnamnews.vn", "name": "Vietnam News", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    # Group G: Europe, Middle East & Multilingual (38)
+    {"domain": "thesun.co.uk", "name": "The Sun", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "bild.de", "name": "Bild", "language": "de", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "lemonde.fr", "name": "Le Monde", "language": "fr", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "themoscowtimes.com", "name": "The Moscow Times", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "arabnews.com", "name": "Arab News", "language": "en", "crawl_method": "sitemap+dom", "anti_block_tier": 2},
+    {"domain": "aljazeera.com", "name": "Al Jazeera English", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "israelhayom.com", "name": "Israel Hayom", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "euronews.com", "name": "Euronews", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "spiegel.de", "name": "Der Spiegel", "language": "de", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "sueddeutsche.de", "name": "Sueddeutsche Zeitung", "language": "de", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "welt.de", "name": "Die Welt", "language": "de", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "faz.net", "name": "Frankfurter Allgemeine", "language": "de", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "corriere.it", "name": "Corriere della Sera", "language": "it", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "repubblica.it", "name": "La Repubblica", "language": "it", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "ansa.it", "name": "ANSA", "language": "it", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "elpais.com", "name": "El Pais", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "elmundo.es", "name": "El Mundo", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "abc.es", "name": "ABC Spain", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "lavanguardia.com", "name": "La Vanguardia", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "lefigaro.fr", "name": "Le Figaro", "language": "fr", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "liberation.fr", "name": "Liberation", "language": "fr", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "france24.com", "name": "France 24", "language": "fr", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "ouest-france.fr", "name": "Ouest-France", "language": "fr", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "wyborcza.pl", "name": "Gazeta Wyborcza", "language": "pl", "crawl_method": "rss+dom", "anti_block_tier": 2},
+    {"domain": "pap.pl", "name": "Polish Press Agency", "language": "pl", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    {"domain": "idnes.cz", "name": "iDNES", "language": "cs", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "intellinews.com", "name": "Intellinews", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "balkaninsight.com", "name": "Balkan Insight (BIRN)", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "centraleuropeantimes.com", "name": "Central European Times", "language": "en", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    {"domain": "aftonbladet.se", "name": "Aftonbladet", "language": "sv", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "tv2.no", "name": "TV2 Norway", "language": "no", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "yle.fi", "name": "YLE News", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "icelandmonitor.mbl.is", "name": "Iceland Monitor", "language": "en", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    {"domain": "middleeasteye.net", "name": "Middle East Eye", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "al-monitor.com", "name": "Al-Monitor", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "haaretz.com", "name": "Haaretz", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 3},
+    {"domain": "jpost.com", "name": "Jerusalem Post", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "jordantimes.com", "name": "Jordan Times", "language": "en", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    # Group H: Africa (4)
+    {"domain": "allafrica.com", "name": "AllAfrica", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "africanews.com", "name": "Africanews", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "theafricareport.com", "name": "The Africa Report", "language": "en", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "panapress.com", "name": "Panapress", "language": "en", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    # Group I: Latin America (8)
+    {"domain": "clarin.com", "name": "Clarin", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "lanacion.com.ar", "name": "La Nacion Argentina", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "folha.uol.com.br", "name": "Folha de S.Paulo", "language": "pt", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "oglobo.globo.com", "name": "O Globo", "language": "pt", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "digital.elmercurio.com", "name": "El Mercurio", "language": "es", "crawl_method": "dom+sitemap", "anti_block_tier": 3},
+    {"domain": "biobiochile.cl", "name": "BioBioChile", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 1},
+    {"domain": "eltiempo.com", "name": "El Tiempo", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "elcomercio.pe", "name": "El Comercio Peru", "language": "es", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    # Group J: Russia, Central Asia & Others (4)
+    {"domain": "mongolia.gogo.mn", "name": "GoGo Mongolia", "language": "mn", "crawl_method": "rss+dom", "anti_block_tier": 1},
+    {"domain": "ria.ru", "name": "RIA Novosti", "language": "ru", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "rg.ru", "name": "Rossiyskaya Gazeta", "language": "ru", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
+    {"domain": "rbc.ru", "name": "RBC", "language": "ru", "crawl_method": "rss+sitemap", "anti_block_tier": 2},
 ]
+
+# Backward compatibility — tests reference _DEFAULT_SITES
+_DEFAULT_SITES = _FALLBACK_SITES
+
+
+# ---------------------------------------------------------------------------
+# P1: SOT-derived site catalog (prevents hardcoded list desync)
+# ---------------------------------------------------------------------------
+
+def _derive_sites_from_sot(project_dir: Path) -> list[dict[str, Any]] | None:
+    """Derive site catalog from runtime SOT (data/config/sources.yaml).
+
+    P1 Hallucination Prevention: Programmatic derivation ensures the draft
+    config/sources.yaml always reflects the runtime SOT, eliminating manual
+    sync errors that caused the original Camp A/Camp B desync.
+
+    Returns:
+        Sites in _FALLBACK_SITES format, or None if SOT unavailable.
+    """
+    sot_path = project_dir / "data" / "config" / "sources.yaml"
+    if not sot_path.is_file():
+        return None
+    if not _HAS_YAML:
+        return None
+    try:
+        with open(sot_path, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+        sources = data.get("sources", {})
+        if not isinstance(sources, dict) or not sources:
+            return None
+        sites: list[dict[str, Any]] = []
+        for _site_id, cfg in sorted(sources.items()):
+            if not isinstance(cfg, dict):
+                continue
+            url = cfg.get("url", "")
+            domain = url
+            if "://" in domain:
+                from urllib.parse import urlparse
+                domain = urlparse(url).netloc.lower().removeprefix("www.")
+            crawl = cfg.get("crawl", {})
+            primary = crawl.get("primary_method", "rss")
+            fallbacks = crawl.get("fallback_methods", [])
+            if fallbacks and isinstance(fallbacks, list):
+                crawl_method = f"{primary}+{fallbacks[0]}"
+            else:
+                crawl_method = primary
+            sites.append({
+                "domain": domain,
+                "name": cfg.get("name", _site_id),
+                "language": cfg.get("language", "en"),
+                "crawl_method": crawl_method,
+                "anti_block_tier": cfg.get("anti_block", {}).get("ua_tier", 1),
+            })
+        return sites if sites else None
+    except Exception:
+        return None
+
+
+def get_site_catalog(project_dir: Path) -> list[dict[str, Any]]:
+    """Get canonical site catalog — SOT-derived with hardcoded fallback.
+
+    P1: In normal operation, derives from data/config/sources.yaml (runtime SOT).
+    Falls back to _FALLBACK_SITES only when SOT is unavailable.
+    """
+    sot_sites = _derive_sites_from_sot(project_dir)
+    if sot_sites is not None:
+        return sot_sites
+    return list(_FALLBACK_SITES)
 
 
 # ---------------------------------------------------------------------------
@@ -110,16 +254,16 @@ _URL_RE = re.compile(r"https?://[^\s)\"'>]+")
 _DOMAIN_RE = re.compile(r"(?:https?://)?(?:www\.)?([a-z0-9][-a-z0-9]*\.[a-z.]+)", re.IGNORECASE)
 
 
-def _parse_reconnaissance(text: str) -> list[dict[str, Any]]:
+def _parse_reconnaissance(text: str, site_catalog: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Attempt to parse site data from reconnaissance markdown.
 
-    Tries to extract per-site blocks and enrich the default catalog.
+    Tries to extract per-site blocks and enrich the given site catalog.
     """
     if not text.strip():
-        return _DEFAULT_SITES
+        return site_catalog
 
-    # Build a lookup from the default catalog
-    defaults_by_domain = {s["domain"]: dict(s) for s in _DEFAULT_SITES}
+    # Build a lookup from the site catalog
+    defaults_by_domain = {s["domain"]: dict(s) for s in site_catalog}
     enriched: dict[str, dict[str, Any]] = {}
 
     # Strategy: find domain mentions and extract nearby metadata
@@ -270,9 +414,14 @@ def generate_sources_yaml(project_dir: Path) -> dict:
         warnings.append(f"Reconnaissance not found: {recon_path}; using default catalog")
 
     # ------------------------------------------------------------------
+    # P1: Derive site catalog from runtime SOT (prevents desync)
+    # ------------------------------------------------------------------
+    site_catalog = get_site_catalog(project_dir)
+
+    # ------------------------------------------------------------------
     # Parse and enrich sites
     # ------------------------------------------------------------------
-    sites = _parse_reconnaissance(recon_text)
+    sites = _parse_reconnaissance(recon_text, site_catalog)
 
     # ------------------------------------------------------------------
     # Generate YAML

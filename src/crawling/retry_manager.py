@@ -66,11 +66,41 @@ L3_ROUND_DELAYS = [30.0, 60.0, 120.0]  # seconds between rounds
 L4_MAX_RESTARTS = 3
 L4_RESTART_DELAYS = [60.0, 120.0, 300.0]  # seconds between restarts
 
-# Total maximum attempts per URL
-TOTAL_MAX_ATTEMPTS = L1_MAX_RETRIES * L2_STRATEGY_COUNT * L3_MAX_ROUNDS * L4_MAX_RESTARTS
-assert TOTAL_MAX_ATTEMPTS == 90, f"Expected 90 total attempts, got {TOTAL_MAX_ATTEMPTS}"
+# Total maximum attempts per URL in the standard 4-level retry
+TOTAL_STANDARD_ATTEMPTS = L1_MAX_RETRIES * L2_STRATEGY_COUNT * L3_MAX_ROUNDS * L4_MAX_RESTARTS
+assert TOTAL_STANDARD_ATTEMPTS == 90, f"Expected 90 standard attempts, got {TOTAL_STANDARD_ATTEMPTS}"
+# Backward compatibility alias
+TOTAL_MAX_ATTEMPTS = TOTAL_STANDARD_ATTEMPTS
 
-# Tier 6 escalation directory
+# ── Crawling Absolute Principle (크롤링 절대 원칙) ──
+# After standard 90 attempts exhaust, the Never-Abandon loop takes over.
+# It cycles through alternative source strategies (RSS, cache, AMP) with
+# exponential backoff (30s → 60s → 120s → ... → max 600s) until success
+# or daily time budget exhaustion.
+NEVER_ABANDON_MAX_CYCLES = 50  # Safety cap: 50 additional cycles beyond standard 90
+NEVER_ABANDON_BASE_DELAY = 30.0  # Starting delay for persistence loop
+NEVER_ABANDON_MAX_DELAY = 600.0  # Max 10-minute delay between cycles
+NEVER_ABANDON_BACKOFF_FACTOR = 1.5  # Exponential backoff multiplier
+
+# Alternative source strategies for Never-Abandon loop.
+# Names align with DynamicBypassEngine strategy registry
+# (src/crawling/dynamic_bypass.py — D-7 Instance 12).
+ALTERNATIVE_STRATEGIES = [
+    "rotate_user_agent",         # Tier 0: User-Agent string rotation
+    "exponential_backoff",       # Tier 0: Exponential delay with jitter
+    "rss_feed_fallback",         # Tier 0: RSS/Atom feed for full-text articles
+    "google_cache_fallback",     # Tier 0: Google's cached version of the page
+    "amp_version_fallback",      # Tier 0: AMP version (often less protected)
+    "curl_cffi_impersonate",     # Tier 1: TLS fingerprint mimicry (JA3/JA4)
+    "fingerprint_rotation",      # Tier 1: Rotate all TLS profiles
+    "cloudscraper_solve",        # Tier 1: Cloudflare JS challenge solver
+    "patchright_stealth",        # Tier 2: Full stealth browser (Chromium)
+    "camoufox_stealth",          # Tier 2: Full stealth browser (Firefox)
+    "proxy_rotation",            # Tier 3: Proxy pool + TLS mimicry
+    "wayback_fallback",          # Tier 4: Internet Archive (last resort)
+]
+
+# Tier 6 escalation directory (diagnostic reports)
 TIER6_ESCALATION_DIR = PROJECT_ROOT / "logs" / "tier6-escalation"
 
 
@@ -172,6 +202,10 @@ class SiteRetryState:
     retry_history: list[RetryAttempt] = field(default_factory=list)
     exhausted: bool = False
     tier6_escalated: bool = False
+    # Never-Abandon Persistence Loop (크롤링 절대 원칙)
+    never_abandon_cycle: int = 0
+    never_abandon_strategy_idx: int = 0
+    never_abandon_active: bool = False
 
     def record_attempt(
         self,
@@ -540,11 +574,15 @@ class RetryManager:
         return False
 
     def escalate_tier6(self, site_id: str) -> Path:
-        """Trigger Tier 6 escalation -- write diagnostic report.
+        """Trigger Tier 6 Never-Abandon escalation.
 
-        Writes a comprehensive failure report to
-        ``logs/tier6-escalation/{site}-{date}.json`` for Claude Code
-        interactive analysis.
+        Writes a diagnostic report AND activates the Never-Abandon
+        persistence loop. Unlike the old "human escalation" which gave up,
+        this marks the site for continued retry with alternative strategies.
+
+        크롤링 절대 원칙: NEVER abandon a crawl target. After standard 90
+        attempts exhaust, activate the persistence loop with alternative
+        source strategies (RSS, cache, AMP, etc.).
 
         Args:
             site_id: Site identifier.
@@ -554,12 +592,15 @@ class RetryManager:
         """
         state = self.get_state(site_id)
         state.tier6_escalated = True
+        state.never_abandon_active = True
+        # Reset exhausted flag — Never-Abandon overrides exhaustion
+        state.exhausted = False
 
         TIER6_ESCALATION_DIR.mkdir(parents=True, exist_ok=True)
         report_path = TIER6_ESCALATION_DIR / f"{site_id}-{self._crawl_date}.json"
 
         report = {
-            "escalation": "tier6",
+            "escalation": "tier6_never_abandon",
             "site_id": site_id,
             "crawl_date": self._crawl_date,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -574,23 +615,75 @@ class RetryManager:
             },
             "failed_url_list": sorted(state.failed_urls),
             "retry_history": [a.to_dict() for a in state.retry_history[-100:]],
-            "diagnosis_hint": (
-                "All 90 automated attempts exhausted. "
-                "Review retry_history for error patterns. "
-                "Common causes: persistent bot blocking, site down, "
-                "paywall changes, DNS issues."
-            ),
+            "never_abandon": {
+                "status": "ACTIVE",
+                "max_cycles": NEVER_ABANDON_MAX_CYCLES,
+                "strategies": ALTERNATIVE_STRATEGIES,
+                "message": (
+                    "Standard 90 attempts exhausted. Never-Abandon persistence "
+                    "loop activated. System will cycle through alternative "
+                    "strategies with exponential backoff until success."
+                ),
+            },
         }
 
         with open(report_path, "w", encoding="utf-8") as f:
             json.dump(report, f, indent=2, ensure_ascii=False)
 
-        logger.error(
-            "tier6_escalation site_id=%s total_attempts=%s failed=%s report=%s",
-            site_id, state.total_attempts, len(state.failed_urls), str(report_path),
+        logger.warning(
+            "never_abandon_activated site_id=%s total_attempts=%s failed=%s "
+            "strategies=%s report=%s",
+            site_id, state.total_attempts, len(state.failed_urls),
+            len(ALTERNATIVE_STRATEGIES), str(report_path),
         )
 
         return report_path
+
+    def get_never_abandon_strategy(self, site_id: str) -> tuple[str, float]:
+        """Get the next alternative strategy and delay for Never-Abandon loop.
+
+        Cycles through ALTERNATIVE_STRATEGIES with exponential backoff.
+
+        Args:
+            site_id: Site identifier.
+
+        Returns:
+            Tuple of (strategy_name, delay_seconds).
+        """
+        state = self.get_state(site_id)
+        if not state.never_abandon_active:
+            return ("standard", 0.0)
+
+        # Cycle through strategies
+        strategy = ALTERNATIVE_STRATEGIES[
+            state.never_abandon_strategy_idx % len(ALTERNATIVE_STRATEGIES)
+        ]
+        state.never_abandon_strategy_idx += 1
+
+        # Exponential backoff
+        delay = min(
+            NEVER_ABANDON_BASE_DELAY * (NEVER_ABANDON_BACKOFF_FACTOR ** state.never_abandon_cycle),
+            NEVER_ABANDON_MAX_DELAY,
+        )
+
+        return (strategy, delay)
+
+    def advance_never_abandon_cycle(self, site_id: str) -> bool:
+        """Advance to the next Never-Abandon cycle.
+
+        Returns:
+            True if more cycles remain, False if safety cap reached.
+        """
+        state = self.get_state(site_id)
+        state.never_abandon_cycle += 1
+        if state.never_abandon_cycle >= NEVER_ABANDON_MAX_CYCLES:
+            logger.error(
+                "never_abandon_safety_cap site_id=%s cycles=%s "
+                "max=%s — FINAL escalation, manual intervention required",
+                site_id, state.never_abandon_cycle, NEVER_ABANDON_MAX_CYCLES,
+            )
+            return False
+        return True
 
     def get_retry_stats(self) -> dict[str, Any]:
         """Get aggregate retry statistics across all sites.

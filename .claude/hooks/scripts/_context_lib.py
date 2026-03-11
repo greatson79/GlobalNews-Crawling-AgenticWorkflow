@@ -78,6 +78,13 @@ E5_RICH_SIGNALS = [
     E5_COMPLETION_STATE_MARKER,     # "## 결정론적 완료 상태"
     E5_DESIGN_DECISIONS_MARKER,     # "## 주요 설계 결정"
 ]
+# IMMORTAL section markers — D-7 centralization for snapshot generation + KA fallback detection.
+# Used by: generate_snapshot_md() (generator), restore_context.py (detector).
+# Changing these constants automatically updates both sides.
+IMMORTAL_QUALITY_GATE_MARKER = "품질 게이트 상태"
+IMMORTAL_QUALITY_GATE_HEADER = f"## {IMMORTAL_QUALITY_GATE_MARKER} (Quality Gate State)"
+IMMORTAL_WORKFLOW_PROGRESS_MARKER = "워크플로우 진행"
+IMMORTAL_WORKFLOW_PROGRESS_HEADER = f"## {IMMORTAL_WORKFLOW_PROGRESS_MARKER} 현황 (Workflow Progress)"
 
 # --- Truncation limits (Quality First — 절대 기준 1) ---
 # Edit preview: "왜" 그 편집을 했는지 의도 파악 가능한 길이
@@ -2056,7 +2063,7 @@ def generate_snapshot_md(session_id, trigger, project_dir, entries, work_log=Non
     try:
         gate_lines = _extract_quality_gate_state(project_dir)
         if gate_lines:
-            sections.append("## 품질 게이트 상태 (Quality Gate State)")
+            sections.append(IMMORTAL_QUALITY_GATE_HEADER)
             sections.append(
                 "<!-- IMMORTAL: 세션 복원 시 Verification/pACS/Review 재개 맥락 -->"
             )
@@ -2070,7 +2077,7 @@ def generate_snapshot_md(session_id, trigger, project_dir, entries, work_log=Non
     try:
         progress_lines = _extract_workflow_progress(project_dir)
         if progress_lines:
-            sections.append("## 워크플로우 진행 현황 (Workflow Progress)")
+            sections.append(IMMORTAL_WORKFLOW_PROGRESS_HEADER)
             sections.append("<!-- IMMORTAL: 세션 복원 시 전체 진행 상태 즉시 파악 -->")
             sections.append("")
             sections.extend(progress_lines)
@@ -3376,6 +3383,24 @@ def _classify_error_patterns(entries):
                 error_type = etype
                 break
 
+        # Phase 2 enhancement: secondary keyword classification for "unknown" errors
+        # Catches Python exception class names that don't match primary regex patterns
+        if error_type == "unknown":
+            _KEYWORD_FALLBACK = {
+                "syntax": ("SyntaxError", "IndentationError", "TabError"),
+                "dependency": ("ModuleNotFoundError", "ImportError", "PackageNotFoundError"),
+                "type_error": ("TypeError", "AttributeError"),
+                "value_error": ("ValueError", "KeyError", "IndexError", "ZeroDivisionError"),
+                "file_not_found": ("FileNotFoundError", "IsADirectoryError", "NotADirectoryError"),
+                "memory": ("MemoryError", "ResourceWarning"),
+                "connection": ("ConnectionError", "ConnectionRefusedError", "BrokenPipeError"),
+                "timeout": ("TimeoutError", "asyncio.TimeoutError"),
+            }
+            for kw_type, keywords in _KEYWORD_FALLBACK.items():
+                if any(kw in content for kw in keywords):
+                    error_type = kw_type
+                    break
+
         # Skip read-only tool results that match no taxonomy pattern — these are
         # non-failure states (e.g., file too large, empty search results, agent
         # timeout), not actionable errors.
@@ -3415,11 +3440,13 @@ def _classify_error_patterns(entries):
 def _extract_success_patterns(entries):
     """Extract successful tool sequence patterns for cross-session learning.
 
-    Detects "Edit/Write → successful Bash" sequences — the canonical pattern
-    for code modification followed by validation (e.g., tests, builds).
+    Detects three pattern types:
+    1. "success": Edit/Write → successful Bash (code change + validation)
+    2. "recovery": Bash fail → Read → Edit → Bash success (error diagnosis + fix)
+    3. "exploration": Read(n) → Edit (information gathering then action)
 
     P1 Compliance: Deterministic extraction from transcript entries.
-    Returns: list of {"sequence": str, "files": list, "bash_cmd": str} (max 5).
+    Returns: list of {"sequence": str, "files": list, "bash_cmd": str, "type": str} (max 5).
     """
     tool_uses = [e for e in entries if e["type"] == "tool_use"]
     tool_results = [e for e in entries if e["type"] == "tool_result"]
@@ -3434,15 +3461,43 @@ def _extract_success_patterns(entries):
     patterns = []
     # Sliding window: track consecutive Edit/Write, then look for successful Bash
     edit_buffer = []  # (tool_name, file_path)
+    # Phase 4: Recovery detection — track failed Bash followed by Read→Edit→Bash success
+    recovery_buffer = []  # (tool_name, file_path, is_error)
 
     for tu in tool_uses:
         name = tu.get("tool_name", "")
         tid = tu.get("tool_use_id", "")
         is_err = result_by_id.get(tid, False)
+        fp = tu.get("file_path", "")
+        basename = os.path.basename(fp) if fp else ""
 
+        # Track recovery sequences: Bash(fail) → Read → Edit → Bash(success)
+        if name == "Bash" and is_err:
+            recovery_buffer = [("Bash✗", basename, True)]
+        elif recovery_buffer:
+            if name == "Read" and not is_err:
+                recovery_buffer.append(("Read", basename, False))
+            elif name in ("Edit", "Write") and not is_err:
+                recovery_buffer.append((name, basename, False))
+            elif name == "Bash" and not is_err and len(recovery_buffer) >= 2:
+                # Recovery complete: Bash fail → ... → Bash success
+                seq_parts = [t[0] for t in recovery_buffer[-5:]]
+                seq_parts.append("Bash✓")
+                files = sorted(set(t[1] for t in recovery_buffer if t[1]))
+                cmd = tu.get("command", "")[:100]
+                patterns.append({
+                    "sequence": "→".join(seq_parts),
+                    "files": files[:5],
+                    "bash_cmd": cmd,
+                    "type": "recovery",
+                })
+                recovery_buffer = []
+            else:
+                recovery_buffer = []  # Sequence broken
+
+        # Original success pattern: Edit/Write → successful Bash
         if name in ("Edit", "Write") and not is_err:
-            fp = tu.get("file_path", "")
-            edit_buffer.append((name, os.path.basename(fp) if fp else ""))
+            edit_buffer.append((name, basename))
         elif name == "Bash" and not is_err and edit_buffer:
             # Successful Bash after Edit/Write sequence — capture pattern
             cmd = tu.get("command", "")[:100]
@@ -3453,6 +3508,7 @@ def _extract_success_patterns(entries):
                 "sequence": "→".join(seq_parts),
                 "files": files[:5],
                 "bash_cmd": cmd,
+                "type": "success",
             })
             edit_buffer = []  # Reset buffer after capture
         elif name not in ("Edit", "Write", "Read"):
@@ -3530,6 +3586,48 @@ _KA_REVIEW_ISSUES_RE = re.compile(
 )
 _KA_PACS_COLOR_RE = re.compile(r'(RED|YELLOW|GREEN)', re.IGNORECASE)
 _KA_PACS_SCORE_NUM_RE = re.compile(r'pACS\s*[:=]?\s*(\d+)')
+
+
+def _extract_pacs_history_from_sot(project_dir):
+    """Phase 3: Extract pACS history from SOT as fallback for quality summary.
+
+    When pacs-logs/ directory is empty (e.g., session didn't run workflow),
+    the SOT pacs.history field still contains cumulative quality data from
+    previous workflow execution. This ensures quality context persists in KA
+    even for non-workflow sessions.
+
+    P1 Compliance: Deterministic YAML extraction.
+    SOT Compliance: Read-only access.
+    Returns: dict {step_N: {score: int, grade: str}} or None.
+    """
+    if not project_dir:
+        return None
+    try:
+        import yaml
+        for sp in sot_paths(project_dir):
+            if os.path.exists(sp) and not sp.endswith(".json"):
+                with open(sp, "r", encoding="utf-8") as f:
+                    data = yaml.safe_load(f.read())
+                if isinstance(data, dict):
+                    wf = data.get("workflow", {})
+                    if isinstance(wf, dict):
+                        history = wf.get("pacs", {}).get("history", {})
+                        if isinstance(history, dict) and history:
+                            summary = {}
+                            for step_key, step_data in history.items():
+                                if isinstance(step_data, dict) and "score" in step_data:
+                                    score = step_data["score"]
+                                    if score < 50:
+                                        grade = "RED"
+                                    elif score < 70:
+                                        grade = "YELLOW"
+                                    else:
+                                        grade = "GREEN"
+                                    summary[step_key] = {"score": score, "grade": grade}
+                            return summary if summary else None
+    except Exception:
+        pass
+    return None
 
 
 def _extract_verification_outcomes(project_dir):
@@ -3876,7 +3974,11 @@ def extract_session_facts(session_id, trigger, project_dir, entries, token_estim
 
     # 9. Workflow quality summary — archive to KI for cross-session progress tracking
     # Gap G: Enables RLM query "which steps were RED/YELLOW/GREEN?"
+    # Phase 3 enhancement: fallback to SOT pacs.history if pacs-logs/ is empty
     wf_quality = _extract_workflow_quality_summary(project_dir)
+    if not wf_quality:
+        # Fallback: extract from SOT pacs.history (cumulative, survives log absence)
+        wf_quality = _extract_pacs_history_from_sot(project_dir)
     if wf_quality:
         facts["workflow_quality_summary"] = wf_quality
 

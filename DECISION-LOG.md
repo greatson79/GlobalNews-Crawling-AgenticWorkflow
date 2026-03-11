@@ -851,6 +851,88 @@
 - **근거**: 3회 연속 실패는 일시적 장애가 아닌 구조적 문제를 시사한다. 나머지 사이트의 크롤링을 지연시키지 않기 위해 early bail-out이 필요하다.
 - **대안**: 전역 실패 카운터 → 기각 (한 사이트의 실패가 다른 사이트 렌더링을 차단)
 
+### ADR-058: SM5 Quality Gate Evidence Guard — Level B → Level A 승격
+
+- **날짜**: 2026-03-11
+- **상태**: Accepted
+- **맥락**: 기존 품질 게이트(L0 Anti-Skip, L1 Verification, L1.5 pACS, L2 Review)는 Orchestrator가 Python 스크립트를 "호출"해야 검증이 수행되는 Level B 보호였다. LLM이 호출을 건너뛰면 품질 게이트 없이 단계가 진행될 수 있었다.
+- **결정**: SOT의 `advance-step` 명령 자체에 품질 게이트 증거 검증(SM5a-SM5d)을 내장하여, 단계 진행 시 verification-logs + pacs-logs + review-logs 존재를 물리적으로 강제한다 (Level A 보호).
+- **근거**:
+  - **Level A vs Level B**: Level A는 Python이 물리적으로 차단 (LLM 우회 불가), Level B는 LLM이 호출해야 검증 수행. SM5는 핵심 품질 게이트를 Level A로 승격.
+  - **2-stage pACS 파싱**: `pACS = min(F, C, L) = 75` 형식(실제 로그 포맷)을 정확히 파싱하기 위해 `_PACS_WITH_MIN_RE` → `_PACS_SIMPLE_RE` 2단계 파싱 적용. D-7 `_context_lib.py` 정합.
+  - **Lock 내부 배치**: SM5를 lock 외부에 두면 CR-1(잘못된 step_num) 에러 대신 SM5a(파일 미존재) 에러가 먼저 발생하여 사용자에게 오해를 준다. Lock 내부에서 CR-1 → SM3 → SM4 → SM5 순서를 보장.
+  - **Force 감사**: `--force` 우회 시 `autopilot-logs/sm5-force-audit.jsonl`에 append-only JSONL 감사 기록. 긴급 상황에서의 우회를 추적 가능.
+  - **Tuple 반환**: `_check_gate_evidence()` → `(block_or_None, warnings_list)`. pACS 파싱 경고가 비차단이면서도 유실되지 않도록 설계.
+- **대안**:
+  - Level B 유지 (LLM 호출에 의존) → 기각 (LLM이 건너뛸 수 있음)
+  - SM5를 lock 외부 배치 → 시도 후 기각 (4개 테스트 실패 — 에러 순서 역전)
+  - Dead code `_save_gate_run_evidence()` 유지 → 기각 (SM5와 무관한 사용되지 않는 코드 — H2 제거)
+- **테스트**: 17개 SM5 전용 테스트 (`tests/unit/test_sot_manager.py::TestSM5GateEvidence`)
+- **관련 커밋**: SM5 Quality Gate Evidence Guard 구현
+
+### ADR-059: SM5c 2-Stage pACS 파싱 — D-7 `_context_lib.py` 정합
+
+- **날짜**: 2026-03-11
+- **상태**: Accepted
+- **맥락**: SM5c의 초기 regex `r'pACS\s*[=:]\s*(\d+)'`는 `pACS = min(F, C, L) = 35` 형식(실제 워크플로우에서 생성되는 pACS 로그 포맷)을 파싱하지 못했다. `min(F, C, L)` 부분의 `=` 기호 뒤에 오는 괄호 표현식을 건너뛰고 첫 번째 숫자(왼쪽 패턴)를 잡으려 했으나 실패. 이는 RED zone(pACS < 50) 파일이 SM5c를 통과하는 치명적 결함이었다.
+- **결정**: `_context_lib.py`의 PA7 검증에서 사용하는 정확히 같은 2-stage 파싱 로직을 D-7 복제:
+  1. Stage 1: `_PACS_WITH_MIN_RE` — `pACS = min(F, C, L) = 75` 형식 매칭
+  2. Stage 2 (fallback): `_PACS_SIMPLE_RE` — `pACS = 75` 단순 형식 매칭 (1개만 존재 시)
+- **근거**: `_context_lib.py`에서 이미 검증된 파싱 로직을 D-7 복제하여 정합성을 보장한다. 두 regex를 `sot_manager.py` 모듈 레벨에 컴파일하여 프로세스당 1회만 컴파일.
+- **대안**: `_context_lib.py`에서 import → 기각 (sot_manager.py는 독립 실행 가능해야 함, 의존성 최소화 원칙)
+
+### ADR-060: 44→121 사이트 확장 (Groups H, I, J 추가)
+
+- **날짜**: 2026-03-11
+- **상태**: Accepted
+- **맥락**: 초기 44개 사이트(Groups A-G)는 주요 4대 권역을 커버했으나, 아프리카·라틴아메리카·러시아/중앙아시아가 누락되어 교차 문화 분석의 편향이 존재했다.
+- **결정**: 77개 사이트를 추가하여 총 121개 사이트(10개 그룹)으로 확장한다.
+  - Group H (아프리카, 4): AllAfrica, Africanews, TheAfricaReport, Panapress
+  - Group I (라틴 아메리카, 8): Clarin, LaNacion, Folha, OGlobo, ElMercurio, BioBioChile, ElTiempo, ElComercio
+  - Group J (러시아/중앙아시아, 4): GoGo Mongolia, RIA, RG, RBC
+  - 기존 Groups D(7→10), E(12→22), F(6→23), G(7→38)도 사이트 추가로 확장
+- **근거**: 절대 기준 1(품질) — 7대 권역 균형 커버리지로 교차 분석 품질 향상. Groups H-J는 기존 `multilingual` strategy group에 통합.
+- **영향**: sources.yaml, extract_site_urls.py, split_sites_by_group.py, validate_site_coverage.py, distribute_sites_to_teams.py — 5개 파일의 사이트 리스트 동기화 필수 (ADR-061 참조)
+
+### ADR-061: P1 사이트 레지스트리 교차 검증 (validate_site_registry_sync.py)
+
+- **날짜**: 2026-03-11
+- **상태**: Accepted
+- **맥락**: 121개 사이트 리스트가 5개 파일에 하드코딩되어 있으며, 한 파일의 사이트 추가/삭제가 다른 파일에 전파되지 않으면 silent failure가 발생한다. 실제로 사이트 desync 버그가 이 테스트 스위트의 개발 동기였다.
+- **결정**: `validate_site_registry_sync.py` P1 검증 스크립트를 신규 생성하여 5개 소스의 도메인 리스트를 교차 검증한다.
+  - RS1: 모든 소스 쌍의 정규화된 도메인 집합 동일성
+  - RS2: 그룹별 카운트 정합성 (kr-major=12, kr-tech=10, english=22, multilingual=77)
+  - RS3: 런타임 SOT(sources.yaml) 정합성 (선택적)
+  - RS4: 총 카운트 = 121
+- **근거**: 도메인 정규화(`normalize_domain()`)가 6개 접두어(www, en, e, news, digital, mongolia, edition)를 제거하고 2개 별칭(huffpost↔huffingtonpost, taiwannews.com.tw↔taiwannews.com)을 해소하여, 파일별 표기 차이를 흡수한다.
+- **대안**: 단일 파일에서 동적 생성 → 기각 (5개 파일은 각각 다른 문맥에서 독립 사용되므로 D-7 패턴이 적절)
+- **테스트**: `tests/structural/test_d7_sync.py::TestSiteRegistrySync` (2 tests) + `tests/structural/test_site_consistency.py` (10+ tests)
+
+### ADR-062: DynamicBypassEngine + Never-Abandon 루프
+
+- **날짜**: 2026-03-11
+- **상태**: Accepted
+- **맥락**: 기존 anti_block.py의 6-Tier 에스컬레이션은 차단 유형을 고려하지 않는 선형 에스컬레이션이었다. 121개 사이트로 확장하면서 차단 유형별 최적 전략이 필요해졌다.
+- **결정**: `DynamicBypassEngine`(dynamic_bypass.py)을 도입하여 차단 유형(7 BlockTypes)에 따라 최적 전략을 5-Tier(T0-T4)로 자동 에스컬레이션한다.
+  - 12개 전략: rotate_user_agent, exponential_backoff, stealth_headers, proxy_rotation, browser_rendering, captcha_solver, javascript_rendering, fingerprint_randomization, session_rotation, residential_proxy, distributed_crawling, human_simulation
+  - Never-Abandon 루프: Phase A (DynamicBypassEngine) → Phase B (TotalWar fallback)
+  - `is_at_max_escalation()` (기존 `is_paused()` 리네임) — 의미 명확화
+- **근거**: 차단 유형별 전략 매칭으로 불필요한 에스컬레이션 단계를 건너뛰어 수집 속도 향상. `ALTERNATIVE_STRATEGIES`와 D-7 동기화로 전략 목록 정합성 보장.
+- **테스트**: `tests/crawling/test_dynamic_bypass.py` (30+ tests, D-7 sync 4 tests 포함)
+
+### ADR-063: D-7 동기화 테스트 인프라 (test_d7_sync.py)
+
+- **날짜**: 2026-03-11
+- **상태**: Accepted
+- **맥락**: D-7 의도적 중복 인스턴스가 13개로 증가하면서, 수동 동기화의 위험이 높아졌다. 기존에는 코드 주석과 문서로만 관리되었다.
+- **결정**: `tests/structural/test_d7_sync.py`를 신규 생성하여 4개 D-7 인스턴스를 P1 테스트로 교차 검증한다.
+  - H-5: pACS regex 패턴 동일성 (sot_manager.py ↔ _context_lib.py) — 패턴 문자열 + 플래그 + 행동 동등성 10 tests
+  - H-6: Python 버전 제약 (pyproject.toml ↔ main.py ↔ setup_init.py ↔ preflight_check.py) — 3 tests
+  - H-8: GATE_DIRS 매핑 (validate_retry_budget.py ↔ generate_context_summary.py) — 1 test
+  - H-9: 사이트 레지스트리 (validate_site_registry_sync.py 위임) — 2 tests
+- **근거**: D-7 desync는 silent runtime failure를 유발한다. pytest가 CI에서 자동으로 잡아준다.
+- **대안**: 런타임 import로 중복 제거 → 기각 (독립 실행 가능성 보존, 장애 격리 원칙)
+
 ---
 
 ## 문서 관리

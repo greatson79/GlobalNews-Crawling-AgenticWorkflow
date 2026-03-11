@@ -13,6 +13,16 @@ import os
 import pytest
 
 
+def _create_gate_evidence(project_dir, step_num, pacs_score=75):
+    """Helper: create verification + pACS log files for SM5 gate checks."""
+    for d in ("verification-logs", "pacs-logs"):
+        os.makedirs(os.path.join(project_dir, d), exist_ok=True)
+    with open(os.path.join(project_dir, "verification-logs", f"step-{step_num}-verify.md"), "w") as f:
+        f.write(f"# Verification — Step {step_num}\n\nAll criteria: PASS\n")
+    with open(os.path.join(project_dir, "pacs-logs", f"step-{step_num}-pacs.md"), "w") as f:
+        f.write(f"# pACS — Step {step_num}\n\npACS = {pacs_score}\n")
+
+
 # ============================================================================
 # Full Lifecycle
 # ============================================================================
@@ -45,6 +55,9 @@ class TestFullLifecycle:
             result = sot_mod.cmd_update_pacs(pd, step, 80, 75, 82)
             assert result["valid"]
             assert result["zone"] == "GREEN"
+
+            # SM5: Create gate evidence files
+            _create_gate_evidence(pd, step, pacs_score=75)
 
             # Advance
             result = sot_mod.cmd_advance_step(pd, step)
@@ -251,11 +264,14 @@ class TestErrorRecovery:
 
         # SM-ST1: Must advance to final step before setting "completed"
         total = sot_mod.cmd_read(pd)["workflow"]["total_steps"]
+        human_steps = {4, 8, 18}
         for step in range(1, total + 1):
             out_path = os.path.join(pd, f"step-{step}-output.md")
             with open(out_path, "w") as f:
                 f.write(f"# Step {step} output\n" + "x" * 200)
             sot_mod.cmd_record_output(pd, step, out_path)
+            if step not in human_steps:
+                _create_gate_evidence(pd, step, pacs_score=75)
             sot_mod.cmd_advance_step(pd, step)
 
         sot_mod.cmd_set_status(pd, "completed")

@@ -1,6 +1,6 @@
 """GlobalNews Crawling & Analysis System.
 
-A staged monolith that crawls 44 international news sites,
+A staged monolith that crawls 121 international news sites,
 processes articles through an 8-stage NLP analysis pipeline,
 and produces structured Parquet/SQLite output for social trend research.
 

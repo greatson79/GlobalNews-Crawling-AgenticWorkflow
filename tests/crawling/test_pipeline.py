@@ -40,7 +40,7 @@ from src.crawling.retry_manager import (
     L3_ROUND_DELAYS,
     L4_MAX_RESTARTS,
     L4_RESTART_DELAYS,
-    TOTAL_MAX_ATTEMPTS,
+    TOTAL_STANDARD_ATTEMPTS,
 )
 
 
@@ -49,7 +49,7 @@ class TestRetryMath:
 
     def test_total_max_attempts_is_90(self) -> None:
         """5 x 2 x 3 x 3 = 90."""
-        assert TOTAL_MAX_ATTEMPTS == 90
+        assert TOTAL_STANDARD_ATTEMPTS == 90
 
     def test_level_constants(self) -> None:
         """Individual level constants are correct."""
@@ -59,9 +59,9 @@ class TestRetryMath:
         assert L4_MAX_RESTARTS == 3
 
     def test_multiplication_identity(self) -> None:
-        """The product of all level constants equals TOTAL_MAX_ATTEMPTS."""
+        """The product of all level constants equals TOTAL_STANDARD_ATTEMPTS."""
         product = L1_MAX_RETRIES * L2_STRATEGY_COUNT * L3_MAX_ROUNDS * L4_MAX_RESTARTS
-        assert product == TOTAL_MAX_ATTEMPTS
+        assert product == TOTAL_STANDARD_ATTEMPTS
 
     def test_round_delays_length(self) -> None:
         """Round delays list has enough entries for all rounds."""
@@ -335,7 +335,7 @@ class TestRetryManager:
         assert not manager.is_exhausted("test")
 
     def test_escalate_tier6(self, tmp_path: Path) -> None:
-        """Tier 6 escalation writes a JSON diagnostic report."""
+        """Tier 6 escalation writes a JSON diagnostic report and activates Never-Abandon."""
         manager = RetryManager(crawl_date="2026-02-25")
         state = manager.get_state("test_site")
         state.failed_urls = {"u1", "u2"}
@@ -347,12 +347,14 @@ class TestRetryManager:
         assert report_path.exists()
         with open(report_path) as f:
             report = json.load(f)
-        assert report["escalation"] == "tier6"
+        assert report["escalation"] == "tier6_never_abandon"
         assert report["site_id"] == "test_site"
         assert report["crawl_date"] == "2026-02-25"
         assert report["summary"]["total_attempts"] == 50
         assert len(report["failed_url_list"]) == 2
         assert state.tier6_escalated
+        assert state.never_abandon_active
+        assert not state.exhausted  # Never-Abandon resets exhaustion
 
     def test_get_retry_stats(self) -> None:
         manager = RetryManager()

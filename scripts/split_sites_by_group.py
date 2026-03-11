@@ -6,12 +6,12 @@ Usage:
 
 Output: 4 JSON files in planning/team-input/
     - group-kr-major.json   (Groups A+B+C = 12 Korean major/economy/niche sites)
-    - group-kr-tech.json    (Group D = 7 Korean IT/Science sites)
-    - group-english.json    (Group E = 12 US/English major sites)
-    - group-multilingual.json (Groups F+G = 13 Asia-Pacific + Europe/ME sites)
+    - group-kr-tech.json    (Group D = 10 Korean IT/Science sites)
+    - group-english.json    (Group E = 22 US/English major sites)
+    - group-multilingual.json (Groups F-J = 77 Asia-Pacific + Europe/ME + Africa + LatAm + Russia sites)
 
 This is a P1 pre-processing script: deterministic extraction, no LLM inference.
-It divides the 44 target sites into 4 balanced groups for the crawl-strategy-team
+It divides the 121 target sites into 4 balanced groups for the crawl-strategy-team
 (Step 6). Each group file includes per-site metadata and, if available, the
 reconnaissance data from Step 1.
 """
@@ -51,7 +51,7 @@ _SITES: list[dict[str, Any]] = [
     {"domain": "nocutnews.co.kr", "language": "ko", "group": "C", "label": "Korean Niche", "notes": ""},
     {"domain": "kmib.co.kr", "language": "ko", "group": "C", "label": "Korean Niche", "notes": ""},
     {"domain": "ohmynews.com", "language": "ko", "group": "C", "label": "Korean Niche", "notes": ""},
-    # Group D — Korean IT/Science (7)
+    # Group D — Korean IT/Science (10)
     {"domain": "38north.org", "language": "en", "group": "D", "label": "Korean IT/Science", "notes": "English-language analysis site"},
     {"domain": "bloter.net", "language": "ko", "group": "D", "label": "Korean IT/Science", "notes": ""},
     {"domain": "etnews.com", "language": "ko", "group": "D", "label": "Korean IT/Science", "notes": ""},
@@ -59,34 +59,114 @@ _SITES: list[dict[str, Any]] = [
     {"domain": "zdnet.co.kr", "language": "ko", "group": "D", "label": "Korean IT/Science", "notes": ""},
     {"domain": "irobotnews.com", "language": "ko", "group": "D", "label": "Korean IT/Science", "notes": ""},
     {"domain": "techneedle.com", "language": "ko", "group": "D", "label": "Korean IT/Science", "notes": ""},
-    # Group E — US/English Major (12)
+    {"domain": "insight.co.kr", "language": "ko", "group": "D", "label": "Korean IT/Science", "notes": ""},
+    {"domain": "stratechery.com", "language": "en", "group": "D", "label": "Korean IT/Science", "notes": "English-language tech analysis"},
+    {"domain": "techmeme.com", "language": "en", "group": "D", "label": "Korean IT/Science", "notes": "English-language tech aggregator"},
+    # Group E — US/English Major (22)
     {"domain": "marketwatch.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
     {"domain": "voakorea.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
     {"domain": "huffingtonpost.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
-    {"domain": "nytimes.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall — requires undetected-chromedriver"},
-    {"domain": "ft.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall — requires undetected-chromedriver"},
-    {"domain": "wsj.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall — requires undetected-chromedriver"},
+    {"domain": "nytimes.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall"},
+    {"domain": "ft.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall"},
+    {"domain": "wsj.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall"},
     {"domain": "latimes.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
     {"domain": "buzzfeed.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
     {"domain": "nationalpost.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
     {"domain": "edition.cnn.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
-    {"domain": "bloomberg.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall — requires undetected-chromedriver"},
+    {"domain": "bloomberg.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall"},
     {"domain": "afmedios.com", "language": "es", "group": "E", "label": "US/English Major", "notes": "Spanish-language"},
-    # Group F — Asia-Pacific (6)
+    {"domain": "wired.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "investing.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "qz.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "bbc.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "theguardian.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "thetimes.com", "language": "en", "group": "E", "label": "US/English Major", "notes": "Paywall"},
+    {"domain": "telegraph.co.uk", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "politico.eu", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "euractiv.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    {"domain": "natureasia.com", "language": "en", "group": "E", "label": "US/English Major", "notes": ""},
+    # Group F — Asia-Pacific (23)
     {"domain": "people.com.cn", "language": "zh", "group": "F", "label": "Asia-Pacific", "notes": "Chinese encoding (GB2312/UTF-8)"},
     {"domain": "globaltimes.cn", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Chinese state media, English edition"},
     {"domain": "scmp.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "South China Morning Post"},
     {"domain": "taiwannews.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": ""},
-    {"domain": "yomiuri.co.jp", "language": "ja", "group": "F", "label": "Asia-Pacific", "notes": "Japanese encoding (Shift_JIS/UTF-8)"},
+    {"domain": "yomiuri.co.jp", "language": "ja", "group": "F", "label": "Asia-Pacific", "notes": "Japanese encoding"},
     {"domain": "thehindu.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": ""},
-    # Group G — Europe/Middle East (7)
+    {"domain": "mainichi.jp", "language": "ja", "group": "F", "label": "Asia-Pacific", "notes": "Japanese"},
+    {"domain": "asahi.com", "language": "ja", "group": "F", "label": "Asia-Pacific", "notes": "Japanese"},
+    {"domain": "yahoo.co.jp", "language": "ja", "group": "F", "label": "Asia-Pacific", "notes": "Japanese news portal"},
+    {"domain": "timesofindia.indiatimes.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Indian English"},
+    {"domain": "hindustantimes.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Indian English"},
+    {"domain": "economictimes.indiatimes.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Indian business"},
+    {"domain": "indianexpress.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Indian English"},
+    {"domain": "philstar.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Philippines"},
+    {"domain": "mb.com.ph", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Philippines Manila Bulletin"},
+    {"domain": "inquirer.net", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Philippines"},
+    {"domain": "thejakartapost.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Indonesia"},
+    {"domain": "antaranews.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Indonesia Antara"},
+    {"domain": "tempo.co", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Indonesia"},
+    {"domain": "focustaiwan.tw", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Taiwan CNA"},
+    {"domain": "taipeitimes.com", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Taiwan"},
+    {"domain": "vnexpress.net", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Vietnam English edition"},
+    {"domain": "vietnamnews.vn", "language": "en", "group": "F", "label": "Asia-Pacific", "notes": "Vietnam"},
+    # Group G — Europe/Middle East (38)
     {"domain": "thesun.co.uk", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "UK tabloid"},
-    {"domain": "bild.de", "language": "de", "group": "G", "label": "Europe/Middle East", "notes": "German-language"},
-    {"domain": "lemonde.fr", "language": "fr", "group": "G", "label": "Europe/Middle East", "notes": "French, /en/ section for English"},
+    {"domain": "bild.de", "language": "de", "group": "G", "label": "Europe/Middle East", "notes": "German"},
+    {"domain": "lemonde.fr", "language": "fr", "group": "G", "label": "Europe/Middle East", "notes": "French"},
     {"domain": "themoscowtimes.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": ""},
     {"domain": "arabnews.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Arabic+English, potential RTL"},
     {"domain": "aljazeera.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Arabic+English"},
     {"domain": "israelhayom.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Hebrew+English, potential RTL"},
+    {"domain": "euronews.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Multilingual"},
+    {"domain": "spiegel.de", "language": "de", "group": "G", "label": "Europe/Middle East", "notes": "German"},
+    {"domain": "sueddeutsche.de", "language": "de", "group": "G", "label": "Europe/Middle East", "notes": "German"},
+    {"domain": "welt.de", "language": "de", "group": "G", "label": "Europe/Middle East", "notes": "German"},
+    {"domain": "faz.net", "language": "de", "group": "G", "label": "Europe/Middle East", "notes": "German"},
+    {"domain": "corriere.it", "language": "it", "group": "G", "label": "Europe/Middle East", "notes": "Italian"},
+    {"domain": "repubblica.it", "language": "it", "group": "G", "label": "Europe/Middle East", "notes": "Italian"},
+    {"domain": "ansa.it", "language": "it", "group": "G", "label": "Europe/Middle East", "notes": "Italian wire service"},
+    {"domain": "elpais.com", "language": "es", "group": "G", "label": "Europe/Middle East", "notes": "Spanish"},
+    {"domain": "elmundo.es", "language": "es", "group": "G", "label": "Europe/Middle East", "notes": "Spanish"},
+    {"domain": "abc.es", "language": "es", "group": "G", "label": "Europe/Middle East", "notes": "Spanish"},
+    {"domain": "lavanguardia.com", "language": "es", "group": "G", "label": "Europe/Middle East", "notes": "Spanish"},
+    {"domain": "lefigaro.fr", "language": "fr", "group": "G", "label": "Europe/Middle East", "notes": "French"},
+    {"domain": "liberation.fr", "language": "fr", "group": "G", "label": "Europe/Middle East", "notes": "French"},
+    {"domain": "france24.com", "language": "fr", "group": "G", "label": "Europe/Middle East", "notes": "French multilingual"},
+    {"domain": "ouest-france.fr", "language": "fr", "group": "G", "label": "Europe/Middle East", "notes": "French regional"},
+    {"domain": "wyborcza.pl", "language": "pl", "group": "G", "label": "Europe/Middle East", "notes": "Polish"},
+    {"domain": "pap.pl", "language": "pl", "group": "G", "label": "Europe/Middle East", "notes": "Polish wire service"},
+    {"domain": "idnes.cz", "language": "cs", "group": "G", "label": "Europe/Middle East", "notes": "Czech"},
+    {"domain": "intellinews.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Eastern Europe focus"},
+    {"domain": "balkaninsight.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Balkans focus"},
+    {"domain": "centraleuropeantimes.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Central Europe"},
+    {"domain": "aftonbladet.se", "language": "sv", "group": "G", "label": "Europe/Middle East", "notes": "Swedish"},
+    {"domain": "tv2.no", "language": "no", "group": "G", "label": "Europe/Middle East", "notes": "Norwegian"},
+    {"domain": "yle.fi", "language": "fi", "group": "G", "label": "Europe/Middle East", "notes": "Finnish"},
+    {"domain": "icelandmonitor.mbl.is", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Icelandic English"},
+    {"domain": "middleeasteye.net", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Middle East focus"},
+    {"domain": "al-monitor.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Middle East focus"},
+    {"domain": "haaretz.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Israeli English"},
+    {"domain": "jpost.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Israeli English"},
+    {"domain": "jordantimes.com", "language": "en", "group": "G", "label": "Europe/Middle East", "notes": "Jordanian English"},
+    # Group H — Africa (4)
+    {"domain": "allafrica.com", "language": "en", "group": "H", "label": "Africa", "notes": "Pan-African aggregator"},
+    {"domain": "africanews.com", "language": "en", "group": "H", "label": "Africa", "notes": "Euronews Africa"},
+    {"domain": "theafricareport.com", "language": "en", "group": "H", "label": "Africa", "notes": ""},
+    {"domain": "panapress.com", "language": "en", "group": "H", "label": "Africa", "notes": "Pan-African wire"},
+    # Group I — Latin America (8)
+    {"domain": "clarin.com", "language": "es", "group": "I", "label": "Latin America", "notes": "Argentine Spanish"},
+    {"domain": "lanacion.com.ar", "language": "es", "group": "I", "label": "Latin America", "notes": "Argentine Spanish"},
+    {"domain": "folha.uol.com.br", "language": "pt", "group": "I", "label": "Latin America", "notes": "Brazilian Portuguese"},
+    {"domain": "oglobo.globo.com", "language": "pt", "group": "I", "label": "Latin America", "notes": "Brazilian Portuguese"},
+    {"domain": "elmercurio.com", "language": "es", "group": "I", "label": "Latin America", "notes": "Chilean Spanish"},
+    {"domain": "biobiochile.cl", "language": "es", "group": "I", "label": "Latin America", "notes": "Chilean Spanish"},
+    {"domain": "eltiempo.com", "language": "es", "group": "I", "label": "Latin America", "notes": "Colombian Spanish"},
+    {"domain": "elcomercio.pe", "language": "es", "group": "I", "label": "Latin America", "notes": "Peruvian Spanish"},
+    # Group J — Russia/Central Asia (4)
+    {"domain": "gogo.mn", "language": "mn", "group": "J", "label": "Russia/Central Asia", "notes": "Mongolian"},
+    {"domain": "ria.ru", "language": "ru", "group": "J", "label": "Russia/Central Asia", "notes": "Russian state media"},
+    {"domain": "rg.ru", "language": "ru", "group": "J", "label": "Russia/Central Asia", "notes": "Russian government"},
+    {"domain": "rbc.ru", "language": "ru", "group": "J", "label": "Russia/Central Asia", "notes": "Russian business"},
 ]
 
 # Strategy group definitions:
@@ -115,10 +195,10 @@ _STRATEGY_GROUPS: dict[str, dict[str, Any]] = {
     },
     "multilingual": {
         "filename": "group-multilingual.json",
-        "source_groups": ["F", "G"],
-        "description": "Asia-Pacific + Europe/Middle East multilingual sites",
+        "source_groups": ["F", "G", "H", "I", "J"],
+        "description": "Asia-Pacific + Europe/ME + Africa + Latin America + Russia/Central Asia multilingual sites",
         "agent": "@crawl-strategist-asia + @crawl-strategist-global",
-        "focus": "Character encoding, RTL text, geo-blocking, multi-language sections",
+        "focus": "Character encoding, RTL text, geo-blocking, multi-language sections, Spanish/Portuguese/Russian",
     },
 }
 
@@ -209,7 +289,7 @@ def _try_enrich_from_sources_yaml(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Split 44 sites into 4 balanced groups for crawl-strategy-team."
+        description="Split 121 sites into 4 balanced groups for crawl-strategy-team."
     )
     parser.add_argument(
         "--project-dir",

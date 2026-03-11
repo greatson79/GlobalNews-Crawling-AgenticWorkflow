@@ -39,6 +39,7 @@ ANALYSIS_PARQUET_PATH = DATA_OUTPUT_DIR / "analysis.parquet"
 SIGNALS_PARQUET_PATH = DATA_OUTPUT_DIR / "signals.parquet"
 SQLITE_INDEX_PATH = DATA_OUTPUT_DIR / "index.sqlite"
 DEDUP_SQLITE_PATH = DATA_DIR / "dedup.sqlite"
+RUN_METADATA_PATH = DATA_OUTPUT_DIR / "run_metadata.json"
 
 # Intermediate Parquet files
 ARTICLES_PARQUET_PATH = DATA_PROCESSED_DIR / "articles.parquet"
@@ -90,6 +91,15 @@ MAX_CONCURRENT_CRAWL_GROUPS = 6
 # Absolute rule: only collect articles published within the last 24 hours
 # from the crawl start time. This system is designed for daily execution.
 CRAWL_LOOKBACK_HOURS = 24
+
+# ── Crawling Absolute Principle (크롤링 절대 원칙) ──
+# NEVER abandon a crawl target. When a site blocks, firewalls, or defends
+# against our crawling, the system MUST find a way through — escalating
+# anti-block strategies in real-time, bypassing or overcoming defenses.
+# This is the supreme directive above all other crawling considerations.
+# When circuit breaker opens, force immediate re-probe with maximum
+# escalation instead of skipping the site entirely.
+CRAWL_NEVER_ABANDON = True
 
 # User-Agent pool sizes by tier
 UA_TIER_SIZES = {
@@ -198,12 +208,26 @@ CRAWL_GROUPS = {
     "E": "English-Language Western",
     "F": "Asia-Pacific",
     "G": "Europe/Middle East",
+    "H": "Africa",
+    "I": "Latin America",
+    "J": "Russia/Central Asia",
 }
 
 # Valid values for configuration validation
-VALID_REGIONS = {"kr", "us", "uk", "cn", "jp", "de", "fr", "me", "in", "tw", "il", "ru", "mx", "sg"}
-VALID_LANGUAGES = {"ko", "en", "zh", "ja", "de", "fr", "es", "ar", "he"}
-VALID_GROUPS = {"A", "B", "C", "D", "E", "F", "G"}
+# Region codes are validated case-insensitively (config_loader normalizes to lower)
+VALID_REGIONS = {
+    "kr", "us", "uk", "gb", "cn", "jp", "de", "fr", "me", "in", "tw",
+    "il", "ru", "mx", "sg",
+    # Groups H-J regions (Africa, Latin America, Russia/Central Asia, etc.)
+    "af", "ar", "br", "cl", "co", "cz", "es", "eu", "fi", "id", "is",
+    "it", "jo", "mn", "no", "pe", "ph", "pl", "se", "vn",
+}
+VALID_LANGUAGES = {
+    "ko", "en", "zh", "ja", "de", "fr", "es", "ar", "he",
+    # Groups H-J languages
+    "it", "pt", "pl", "cs", "sv", "no", "mn", "ru", "hi",
+}
+VALID_GROUPS = {"A", "B", "C", "D", "E", "F", "G", "H", "I", "J"}
 VALID_CRAWL_METHODS = {"rss", "sitemap", "api", "playwright", "dom"}
 VALID_PAYWALL_TYPES = {"none", "soft-metered", "hard"}
 VALID_DIFFICULTY_TIERS = {"Easy", "Medium", "Hard", "Extreme"}

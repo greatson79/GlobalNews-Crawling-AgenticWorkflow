@@ -37,6 +37,7 @@ from _context_lib import (
     extract_path_tags, extract_recurring_error_types,
     aggregate_risk_scores, atomic_write,
     extract_learned_patterns,
+    IMMORTAL_QUALITY_GATE_MARKER, IMMORTAL_WORKFLOW_PROGRESS_MARKER,
 )
 
 
@@ -376,6 +377,16 @@ def _build_recovery_output(source, latest_path, summary, sot_warning, snapshot_a
         except Exception:
             pass  # Non-blocking — team state is supplementary
 
+    # Phase 5: IMMORTAL KA Fallback — supplement missing quality context
+    # When IMMORTAL sections are absent from snapshot (e.g., after early compact),
+    # query recent KA entries for quality gate state and workflow progress
+    if project_dir and snapshot_content:
+        ka_fallback = _extract_ka_quality_fallback(
+            project_dir, snapshot_content
+        )
+        if ka_fallback:
+            output_lines.extend(ka_fallback)
+
     if ulw_info:
         output_lines.append(f"■ ULW: {ulw_info}")
 
@@ -677,6 +688,119 @@ def _extract_recent_diagnosis_patterns(recent_sessions):
         if len(results) >= 3:
             break
     return results[:3]
+
+
+def _extract_ka_quality_fallback(project_dir, snapshot_content):
+    """Phase 5: IMMORTAL KA Fallback — supplement missing quality gate context.
+
+    When IMMORTAL sections (quality gate state, workflow progress) are absent
+    from the snapshot, queries recent KA entries for workflow_quality_summary,
+    verification_outcomes, and review_outcomes to inject as supplementary context.
+
+    This prevents quality gate context loss across session boundaries when
+    the snapshot was created early (before IMMORTAL sections were populated).
+
+    P1 Compliance: Deterministic extraction from structured JSON data.
+    Returns: list of output lines (may be empty).
+    """
+    has_quality_gate = IMMORTAL_QUALITY_GATE_MARKER in snapshot_content
+    has_workflow_progress = IMMORTAL_WORKFLOW_PROGRESS_MARKER in snapshot_content
+
+    if has_quality_gate and has_workflow_progress:
+        return []  # IMMORTAL sections present — no fallback needed
+
+    ki_path = os.path.join(
+        get_snapshot_dir(project_dir), "knowledge-index.jsonl"
+    )
+    if not os.path.exists(ki_path):
+        return []
+
+    try:
+        entries = []
+        with open(ki_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    try:
+                        entries.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+        if not entries:
+            return []
+        recent = entries[-5:]
+    except Exception:
+        return []
+
+    lines = []
+
+    # Supplement quality gate state from KA
+    if not has_quality_gate:
+        quality_items = []
+        vo_items = []
+        ro_items = []
+
+        for entry in reversed(recent):
+            wqs = entry.get("workflow_quality_summary", {})
+            if isinstance(wqs, dict) and wqs:
+                for step_key, info in sorted(wqs.items()):
+                    if isinstance(info, dict):
+                        score = info.get("score", "?")
+                        grade = info.get("grade", "?")
+                        quality_items.append(
+                            f"    {step_key}: pACS={score} ({grade})"
+                        )
+                break
+
+        for entry in reversed(recent):
+            vo = entry.get("verification_outcomes", {})
+            if isinstance(vo, dict) and vo:
+                for step_key, result in sorted(vo.items()):
+                    vo_items.append(f"    {step_key}: {result}")
+                break
+
+        for entry in reversed(recent):
+            ro = entry.get("review_outcomes", {})
+            if isinstance(ro, dict) and ro:
+                for step_key, info in sorted(ro.items()):
+                    if isinstance(info, dict):
+                        verdict = info.get("verdict", "?")
+                        issues = info.get("issues_count", "?")
+                        ro_items.append(
+                            f"    {step_key}: {verdict} ({issues} issues)"
+                        )
+                break
+
+        if quality_items or vo_items or ro_items:
+            lines.append("")
+            lines.append(
+                "■ 품질 게이트 상태 (KA fallback — IMMORTAL 부재 시 보완):"
+            )
+            if quality_items:
+                lines.append("  pACS:")
+                lines.extend(quality_items[:10])
+            if vo_items:
+                lines.append("  Verification:")
+                lines.extend(vo_items[:10])
+            if ro_items:
+                lines.append("  Review:")
+                lines.extend(ro_items[:10])
+
+    # Supplement workflow progress from KA
+    if not has_workflow_progress:
+        for entry in reversed(recent):
+            wqs = entry.get("workflow_quality_summary", {})
+            if isinstance(wqs, dict) and wqs:
+                completed_steps = sorted(wqs.keys())
+                if completed_steps:
+                    lines.append("")
+                    lines.append(
+                        f"■ 워크플로우 진행 (KA fallback): "
+                        f"{len(completed_steps)}개 단계 완료 — "
+                        f"{', '.join(completed_steps)}"
+                    )
+                break
+
+    return lines
 
 
 def _find_best_snapshot(snapshot_dir, latest_path):

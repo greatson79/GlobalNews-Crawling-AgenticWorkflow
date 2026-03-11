@@ -39,6 +39,7 @@ from typing import Any
 
 from src.config.constants import (
     CRAWL_LOOKBACK_HOURS,
+    CRAWL_NEVER_ABANDON,
     DATA_RAW_DIR,
     MAX_ARTICLES_PER_SITE_PER_DAY,
     DEFAULT_RATE_LIMIT_SECONDS,
@@ -54,6 +55,7 @@ from src.crawling.dedup import DedupEngine
 from src.crawling.ua_manager import UAManager
 from src.crawling.circuit_breaker import CircuitBreakerCoordinator
 from src.crawling.anti_block import AntiBlockEngine
+from src.crawling.dynamic_bypass import DynamicBypassEngine
 from src.crawling.retry_manager import (
     RetryManager,
     StrategyMode,
@@ -306,6 +308,13 @@ class CrawlingPipeline:
         # 4-Level retry manager
         self._retry_manager = RetryManager(crawl_date=self._date)
 
+        # Dynamic Bypass Engine (block-type-aware strategy dispatch)
+        # Used by the Never-Abandon loop for targeted bypass selection
+        self._bypass_engine = DynamicBypassEngine(
+            proxy_pool=[],  # Populated from sources.yaml proxy config if available
+            enable_browser=self._browser_renderer is not None,
+        )
+
         # Crawl state (resume support)
         self._crawl_state = CrawlState(self._output_dir)
 
@@ -503,7 +512,11 @@ class CrawlingPipeline:
         return needs_restart
 
     def _escalate_remaining_failures(self, site_ids: list[str]) -> None:
-        """Escalate remaining failed sites to Tier 6.
+        """Escalate remaining failed sites to Never-Abandon persistence loop.
+
+        크롤링 절대 원칙: NEVER abandon. After standard 90 attempts exhaust,
+        activate the Never-Abandon loop — cycle through alternative source
+        strategies (RSS, cache, AMP, etc.) with exponential backoff.
 
         Args:
             site_ids: Sites that failed all retry levels.
@@ -512,10 +525,285 @@ class CrawlingPipeline:
         for site_id in site_ids:
             if self._retry_manager.is_exhausted(site_id):
                 report_path = self._retry_manager.escalate_tier6(site_id)
-                logger.error(
-                    "tier6_escalation_final site_id=%s report=%s",
+                logger.warning(
+                    "never_abandon_loop_start site_id=%s report=%s",
                     site_id, str(report_path),
                 )
+
+        # Never-Abandon persistence loop for ALL escalated sites
+        if not CRAWL_NEVER_ABANDON:
+            return
+
+        never_abandon_sites = [
+            sid for sid in site_ids
+            if self._retry_manager.get_state(sid).never_abandon_active
+        ]
+
+        if not never_abandon_sites:
+            return
+
+        logger.warning(
+            "never_abandon_loop_entering sites=%s",
+            [s for s in never_abandon_sites],
+        )
+
+        for site_id in never_abandon_sites:
+            self._run_never_abandon_loop(site_id)
+
+    def _run_never_abandon_loop(self, site_id: str) -> None:
+        """Run the Never-Abandon persistence loop for a single site.
+
+        Uses the DynamicBypassEngine to select targeted bypass strategies
+        based on the detected block type. Each cycle tries a different
+        strategy from the engine's recommendation, with exponential
+        backoff between cycles.
+
+        Strategy selection flow:
+        1. Get the last known block type for this site (from BlockDetector)
+        2. Ask DynamicBypassEngine for strategies effective against that block
+        3. Try strategies in order (cheapest first, learned success rate)
+        4. On success → done. On failure → advance cycle, try next strategy.
+
+        Args:
+            site_id: Site identifier.
+        """
+        assert self._retry_manager is not None
+        assert self._circuit_breakers is not None
+
+        state = self._retry_manager.get_state(site_id)
+
+        # Get last known block type from anti-block engine's profile
+        last_block_type = None
+        if self._anti_block is not None:
+            profile = self._anti_block.get_profile(site_id)
+            if profile.last_block_type:
+                from src.crawling.block_detector import BlockType
+                try:
+                    last_block_type = BlockType(profile.last_block_type)
+                except ValueError:
+                    pass
+
+        while self._retry_manager.advance_never_abandon_cycle(site_id):
+            # strategy_name is for logging only — actual strategy selection
+            # is handled by DynamicBypassEngine.try_strategies() in Phase A.
+            strategy_name, delay = self._retry_manager.get_never_abandon_strategy(site_id)
+
+            logger.warning(
+                "never_abandon_cycle site_id=%s cycle=%s base_strategy=%s "
+                "block_type=%s delay=%.1fs",
+                site_id, state.never_abandon_cycle, strategy_name,
+                last_block_type.value if last_block_type else "unknown", delay,
+            )
+
+            # Wait with exponential backoff
+            if delay > 0:
+                time.sleep(min(delay, 120.0))  # Cap actual sleep for usability
+
+            # Reset circuit breaker for fresh attempt
+            self._circuit_breakers.reset(site_id)
+
+            # Phase A: Try DynamicBypassEngine strategies on failed URLs
+            if state.failed_urls and self._bypass_engine is not None:
+                bypass_success = False
+                recovered_urls: list[str] = []
+                output_path = self._output_dir / "all_articles.jsonl"
+                try:
+                    with JSONLWriter(output_path) as writer:
+                        for failed_url in sorted(state.failed_urls):
+                            result = self._bypass_engine.try_strategies(
+                                url=failed_url,
+                                block_type=last_block_type,
+                                site_id=site_id,
+                                timeout=30.0,
+                            )
+                            if result.success:
+                                bypass_success = True
+                                logger.info(
+                                    "never_abandon_bypass_SUCCESS site_id=%s url=%s "
+                                    "strategy=%s tier=%s latency=%.0fms",
+                                    site_id, failed_url[:80],
+                                    result.strategy_name, result.strategy_tier,
+                                    result.latency_ms,
+                                )
+                                self._write_bypass_result(
+                                    site_id, failed_url, result.html, writer,
+                                )
+                                recovered_urls.append(failed_url)
+                            else:
+                                # Update block type cache if detection changed
+                                if result.block_detected:
+                                    last_block_type = result.block_detected
+                                    self._bypass_engine.update_block_cache(
+                                        site_id, result.block_detected,
+                                    )
+                except Exception as e:
+                    logger.warning(
+                        "never_abandon_write_error site_id=%s error=%s",
+                        site_id, str(e)[:100],
+                    )
+
+                for url in recovered_urls:
+                    state.failed_urls.discard(url)
+                    state.successful_urls.add(url)
+
+                if bypass_success and not state.failed_urls:
+                    logger.info(
+                        "never_abandon_ALL_SUCCESS site_id=%s cycle=%s "
+                        "— all URLs recovered via DynamicBypassEngine",
+                        site_id, state.never_abandon_cycle,
+                    )
+                    state.never_abandon_active = False
+                    return  # SUCCESS — mission accomplished
+
+                if bypass_success:
+                    logger.info(
+                        "never_abandon_partial_success site_id=%s "
+                        "remaining_failed=%s",
+                        site_id, len(state.failed_urls),
+                    )
+
+            # Phase B: Fallback — full pipeline re-crawl with TotalWar
+            state.current_strategy = StrategyMode.TOTALWAR
+            state.current_round = 1
+            state.exhausted = False
+
+            if state.failed_urls:
+                state.pending_urls = sorted(state.failed_urls)
+                state.failed_urls = set()
+
+            try:
+                site_cfg = self._get_site_config(site_id)
+                if site_cfg is None:
+                    logger.error("never_abandon_no_config site_id=%s", site_id)
+                    break
+
+                output_path = self._output_dir / "all_articles.jsonl"
+                with JSONLWriter(output_path, append=True) as writer:
+                    result = self._crawl_site_with_retry(site_id, site_cfg, writer)
+
+                if result.extracted_count > 0:
+                    logger.info(
+                        "never_abandon_SUCCESS site_id=%s cycle=%s "
+                        "strategy=totalwar_fallback articles=%s",
+                        site_id, state.never_abandon_cycle,
+                        result.extracted_count,
+                    )
+                    state.never_abandon_active = False
+                    return  # SUCCESS — mission accomplished
+                else:
+                    logger.warning(
+                        "never_abandon_cycle_failed site_id=%s cycle=%s",
+                        site_id, state.never_abandon_cycle,
+                    )
+
+            except KeyboardInterrupt:
+                raise
+            except Exception as e:
+                logger.error(
+                    "never_abandon_cycle_error site_id=%s cycle=%s error=%s",
+                    site_id, state.never_abandon_cycle, str(e)[:200],
+                )
+
+        # Safety cap reached — log final status but DO NOT mark as complete.
+        # The site will be retried on the next daily run.
+        # Also log DynamicBypassEngine stats for post-mortem analysis.
+        if self._bypass_engine is not None:
+            stats = self._bypass_engine.get_domain_stats(site_id)
+            logger.error(
+                "never_abandon_safety_cap_reached site_id=%s total_cycles=%s "
+                "bypass_stats=%s — site will be retried on next daily run",
+                site_id, state.never_abandon_cycle, stats,
+            )
+        else:
+            logger.error(
+                "never_abandon_safety_cap_reached site_id=%s total_cycles=%s "
+                "— site will be retried on next daily run",
+                site_id, state.never_abandon_cycle,
+            )
+
+    def _write_bypass_result(
+        self,
+        site_id: str,
+        url: str,
+        html: str,
+        writer: JSONLWriter,
+    ) -> None:
+        """Extract article from bypassed HTML and write to JSONL.
+
+        Applies the same validation pipeline as the normal crawl path:
+        freshness check (24h lookback) and 3-level dedup (URL/Title/SimHash).
+
+        Args:
+            site_id: Site identifier.
+            url: Original article URL.
+            html: HTML content fetched via bypass strategy.
+            writer: JSONL writer instance.
+        """
+        assert self._extractor is not None
+
+        try:
+            site_cfg = self._get_site_config(site_id) or {}
+            article = self._extractor.extract(
+                url=url,
+                source_id=site_id,
+                site_config=site_cfg,
+                html=html,
+            )
+            if article is None:
+                return
+
+            # Freshness check — same 24h lookback as normal path
+            if article.published_at is not None:
+                pub_dt = article.published_at
+                if pub_dt.tzinfo is None:
+                    pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                if pub_dt < self._lookback_cutoff:
+                    logger.debug(
+                        "bypass_article_outside_24h url=%s published_at=%s",
+                        url[:80], pub_dt.isoformat(),
+                    )
+                    return
+
+            # 3-level dedup check — same cascade as normal path
+            if self._dedup is not None:
+                dedup_result = self._dedup.is_duplicate(
+                    url=article.url,
+                    title=article.title,
+                    body=article.body,
+                    source_id=site_id,
+                    article_id=str(uuid.uuid4()),
+                )
+                if dedup_result.is_duplicate:
+                    logger.debug(
+                        "bypass_article_deduped url=%s level=%s reason=%s",
+                        url[:80], dedup_result.level, dedup_result.reason[:80],
+                    )
+                    return
+
+            writer.write_article(article)
+            logger.debug(
+                "bypass_article_written site_id=%s url=%s title=%s",
+                site_id, url[:80], (article.title or "")[:60],
+            )
+        except Exception as e:
+            logger.warning(
+                "bypass_extraction_error site_id=%s url=%s error=%s",
+                site_id, url[:80], str(e)[:100],
+            )
+
+    def _get_site_config(self, site_id: str) -> dict[str, Any] | None:
+        """Get site configuration by site_id.
+
+        Args:
+            site_id: Site identifier.
+
+        Returns:
+            Site config dict, or None if not found.
+        """
+        try:
+            return get_site_config(site_id)
+        except KeyError:
+            return None
 
     # -----------------------------------------------------------------------
     # Single Pass (all sites, with Level 2+3 retry per site)
@@ -564,18 +852,30 @@ class CrawlingPipeline:
                     results.append(CrawlResult(source_id=site_id))
                     continue
 
-                # Check circuit breaker
+                # Check circuit breaker — Crawling Absolute Principle (크롤링 절대 원칙):
+                # NEVER abandon a site. When circuit breaker is OPEN, force
+                # immediate HALF_OPEN probe with maximum escalation (TotalWar).
                 assert self._circuit_breakers is not None
                 if not self._circuit_breakers.is_allowed(site_id):
-                    logger.warning(
-                        "circuit_breaker_open site_id=%s state=%s",
-                        site_id, self._circuit_breakers.get_state(site_id).value,
-                    )
-                    results.append(CrawlResult(
-                        source_id=site_id,
-                        errors=["Circuit breaker OPEN -- site skipped"],
-                    ))
-                    continue
+                    if CRAWL_NEVER_ABANDON:
+                        logger.warning(
+                            "circuit_breaker_open_force_probe site_id=%s "
+                            "state=%s policy=never_abandon",
+                            site_id, self._circuit_breakers.get_state(site_id).value,
+                        )
+                        self._circuit_breakers.force_half_open(site_id)
+                        # Fall through to _crawl_site_with_retry which will
+                        # escalate to TotalWar mode on failures
+                    else:
+                        logger.warning(
+                            "circuit_breaker_open site_id=%s state=%s",
+                            site_id, self._circuit_breakers.get_state(site_id).value,
+                        )
+                        results.append(CrawlResult(
+                            source_id=site_id,
+                            errors=["Circuit breaker OPEN -- site skipped"],
+                        ))
+                        continue
 
                 try:
                     result = self._crawl_site_with_retry(

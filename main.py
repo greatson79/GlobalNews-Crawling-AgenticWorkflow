@@ -1,6 +1,6 @@
 """GlobalNews Crawling & Analysis System -- Main Entry Point.
 
-A staged monolith that crawls 44 international news sites through
+A staged monolith that crawls 121 international news sites through
 an 8-stage NLP analysis pipeline, producing Parquet/SQLite output
 for social trend research.
 
@@ -12,7 +12,9 @@ Usage:
 """
 
 import argparse
+import json
 import sys
+import time
 from datetime import date, datetime
 from pathlib import Path
 
@@ -53,8 +55,75 @@ from src.config.constants import (
     PIPELINE_YAML_PATH,
     DATA_RAW_DIR,
     CRAWL_GROUPS,
+    RUN_METADATA_PATH,
 )
 from src.utils.logging_config import setup_logging, get_logger
+
+
+def _write_run_metadata(
+    mode: str,
+    target_date: date,
+    exit_code: int,
+    elapsed_seconds: float,
+    *,
+    crawl_report: dict | None = None,
+    analysis_result: object | None = None,
+) -> None:
+    """Write run_metadata.json with pipeline execution summary.
+
+    This is the SOT for "what happened in the last run" — used by
+    ``--mode status`` and for debugging pipeline issues.
+
+    Args:
+        mode: Execution mode (crawl/analyze/full).
+        target_date: Target date for the run.
+        exit_code: Exit code from the pipeline.
+        elapsed_seconds: Total wall time.
+        crawl_report: Optional crawl report dict.
+        analysis_result: Optional analysis pipeline result object.
+    """
+    meta: dict = {
+        "run_timestamp": datetime.utcnow().isoformat() + "Z",
+        "mode": mode,
+        "target_date": target_date.isoformat(),
+        "exit_code": exit_code,
+        "elapsed_seconds": round(elapsed_seconds, 1),
+    }
+
+    if crawl_report is not None:
+        meta["crawl"] = {
+            "total_articles": crawl_report.get("total_articles", 0),
+            "sites_attempted": crawl_report.get("total_sites_attempted", 0),
+            "sites_failed": crawl_report.get("sites_failed", 0),
+        }
+
+    if analysis_result is not None:
+        stages_info = {}
+        for sn, sr in getattr(analysis_result, "stages", {}).items():
+            stages_info[str(sn)] = {
+                "name": sr.stage_name,
+                "success": sr.success,
+                "skipped": sr.skipped,
+                "elapsed_seconds": round(sr.elapsed_seconds, 1),
+                "article_count": sr.article_count,
+            }
+        meta["analysis"] = {
+            "success": analysis_result.success,
+            "stages_completed": analysis_result.stages_completed,
+            "stages_failed": analysis_result.stages_failed,
+            "stages_skipped": analysis_result.stages_skipped,
+            "peak_memory_gb": round(analysis_result.peak_memory_gb, 2),
+            "stages": stages_info,
+        }
+
+    try:
+        RUN_METADATA_PATH.parent.mkdir(parents=True, exist_ok=True)
+        RUN_METADATA_PATH.write_text(
+            json.dumps(meta, indent=2, ensure_ascii=False) + "\n",
+            encoding="utf-8",
+        )
+    except OSError:
+        pass  # Non-critical — don't fail the pipeline for metadata
 
 
 def _validate_date(date_str: str) -> date:
@@ -132,6 +201,7 @@ def cmd_crawl(args: argparse.Namespace) -> int:
     # Dispatch to the full crawling pipeline (Step 12)
     from src.crawling.pipeline import run_crawl_pipeline
 
+    t0 = time.monotonic()
     crawl_date_str = args.date.strftime("%Y-%m-%d") if args.date else None
     try:
         report = run_crawl_pipeline(
@@ -144,6 +214,8 @@ def cmd_crawl(args: argparse.Namespace) -> int:
         raise
     except Exception as e:
         logger.error("Crawl pipeline failed: %s", e, exc_info=True)
+        if not getattr(args, "_skip_metadata", False):
+            _write_run_metadata("crawl", args.date, 1, time.monotonic() - t0)
         return 1
 
     # Exit code: 0 if any articles collected, 1 if total failure
@@ -152,8 +224,12 @@ def cmd_crawl(args: argparse.Namespace) -> int:
     attempted = report.get("total_sites_attempted", 0)
     if attempted > 0 and failed == attempted:
         logger.error("All %s sites failed.", attempted)
+        if not getattr(args, "_skip_metadata", False):
+            _write_run_metadata("crawl", args.date, 1, time.monotonic() - t0, crawl_report=report)
         return 1
     logger.info("Crawl complete: %s articles from %s sites.", total, attempted - failed)
+    if not getattr(args, "_skip_metadata", False):
+        _write_run_metadata("crawl", args.date, 0, time.monotonic() - t0, crawl_report=report)
     return 0
 
 
@@ -200,6 +276,7 @@ def cmd_analyze(args: argparse.Namespace) -> int:
     # Dispatch to the analysis pipeline (Step 15)
     from src.analysis.pipeline import run_analysis_pipeline
 
+    t0 = time.monotonic()
     analyze_date_str = args.date.strftime("%Y-%m-%d") if args.date else None
     try:
         result = run_analysis_pipeline(
@@ -210,6 +287,8 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         raise
     except Exception as e:
         logger.error("Analysis pipeline failed: %s", e, exc_info=True)
+        if not getattr(args, "_skip_metadata", False):
+            _write_run_metadata("analyze", args.date, 1, time.monotonic() - t0)
         return 1
 
     # Print summary
@@ -244,7 +323,10 @@ def cmd_analyze(args: argparse.Namespace) -> int:
         for name, path in result.final_output_paths.items():
             logger.info("  %s: %s", name, path)
 
-    return 0 if result.success else 1
+    exit_code = 0 if result.success else 1
+    if not getattr(args, "_skip_metadata", False):
+        _write_run_metadata("analyze", args.date, exit_code, time.monotonic() - t0, analysis_result=result)
+    return exit_code
 
 
 def cmd_full(args: argparse.Namespace) -> int:
@@ -259,16 +341,24 @@ def cmd_full(args: argparse.Namespace) -> int:
     logger = get_logger("main.full")
     logger.info("Full pipeline started: date=%s dry_run=%s", args.date, args.dry_run)
 
-    # Phase 1: Crawl
+    t0 = time.monotonic()
+
+    # Phase 1: Crawl (suppress sub-command metadata writes)
+    args._skip_metadata = True
     crawl_result = cmd_crawl(args)
     if crawl_result != 0:
         logger.error("Crawling phase failed, aborting analysis.")
+        _write_run_metadata("full", args.date, crawl_result, time.monotonic() - t0)
         return crawl_result
 
     # Phase 2: Analyze (all stages)
     args.all_stages = True
     args.stage = None
-    return cmd_analyze(args)
+    analyze_result = cmd_analyze(args)
+    del args._skip_metadata
+
+    _write_run_metadata("full", args.date, analyze_result, time.monotonic() - t0)
+    return analyze_result
 
 
 def cmd_status(args: argparse.Namespace) -> int:
@@ -309,6 +399,28 @@ def cmd_status(args: argparse.Namespace) -> int:
         except Exception as e:
             print(f"  Error loading sources.yaml: {e}")
 
+    # Last run metadata
+    if RUN_METADATA_PATH.exists():
+        try:
+            meta = json.loads(RUN_METADATA_PATH.read_text(encoding="utf-8"))
+            print(f"\nLast Run:")
+            print(f"  Timestamp: {meta.get('run_timestamp', '?')}")
+            print(f"  Mode: {meta.get('mode', '?')}  Date: {meta.get('target_date', '?')}")
+            print(f"  Exit code: {meta.get('exit_code', '?')}  Elapsed: {meta.get('elapsed_seconds', '?')}s")
+            if "crawl" in meta:
+                c = meta["crawl"]
+                print(f"  Crawl: {c.get('total_articles', 0)} articles, "
+                      f"{c.get('sites_attempted', 0)} sites attempted, "
+                      f"{c.get('sites_failed', 0)} failed")
+            if "analysis" in meta:
+                a = meta["analysis"]
+                print(f"  Analysis: {a.get('stages_completed', 0)} completed, "
+                      f"{a.get('stages_failed', 0)} failed, "
+                      f"{a.get('stages_skipped', 0)} skipped, "
+                      f"peak {a.get('peak_memory_gb', '?')} GB")
+        except (json.JSONDecodeError, OSError):
+            pass
+
     # Check data directories
     print(f"\nData Directories:")
     for name, path in [
@@ -335,7 +447,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="main.py",
         description="GlobalNews Crawling & Analysis System -- "
-                    "Crawl 44 news sites, analyze through 8-stage NLP pipeline, "
+                    "Crawl 121 news sites, analyze through 8-stage NLP pipeline, "
                     "produce Parquet/SQLite output for social trend research.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""\

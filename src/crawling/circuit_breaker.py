@@ -2,7 +2,7 @@
 
 Wraps the base CircuitBreaker from error_handler.py with per-domain isolation,
 integration with the BlockDetector and AntiBlockEngine, and centralized
-state management across all 44 news sites.
+state management across all 121 news sites.
 
 State Machine per domain:
     CLOSED     -- Normal operation, counting consecutive failures.
@@ -298,6 +298,20 @@ class CircuitBreakerCoordinator:
         """
         breaker = self._get_or_create(site_id)
         breaker.record_block_failure(block_type)
+
+    def force_half_open(self, site_id: str) -> None:
+        """Force a circuit breaker from OPEN to HALF_OPEN for immediate probe.
+
+        Implements the Crawling Absolute Principle (크롤링 절대 원칙):
+        NEVER abandon a crawl target. When circuit is OPEN, bypass the
+        recovery_timeout and immediately allow a probe with escalated
+        anti-block strategy.
+
+        Args:
+            site_id: Unique site identifier.
+        """
+        breaker = self._get_or_create(site_id)
+        breaker.force_half_open()
 
     def reset(self, site_id: str) -> None:
         """Force-reset a circuit breaker to CLOSED state.

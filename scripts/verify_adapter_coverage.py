@@ -167,6 +167,73 @@ def _parse_registry(init_path: Path) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# SS4: Config sync check (config/ ↔ data/config/)
+# ---------------------------------------------------------------------------
+
+def _check_config_sync(project_dir: Path) -> dict[str, Any]:
+    """SS4: Verify config/sources.yaml domains match data/config/sources.yaml.
+
+    P1: Detects desync between the Planning Phase draft (config/) and the
+    Implementation Phase runtime SOT (data/config/). The draft is generated
+    by generate_sources_yaml_draft.py and should derive from the SOT.
+    """
+    draft_path = project_dir / "config" / "sources.yaml"
+    sot_path = project_dir / "data" / "config" / "sources.yaml"
+
+    result: dict[str, Any] = {"check": "SS4_config_sync", "valid": True, "warnings": []}
+
+    if not draft_path.is_file():
+        result["warnings"].append(
+            "SS4: config/sources.yaml not found "
+            "(regenerate: python3 scripts/generate_sources_yaml_draft.py --project-dir .)"
+        )
+        result["valid"] = False
+        return result
+
+    if not sot_path.is_file():
+        result["warnings"].append("SS4: data/config/sources.yaml (runtime SOT) not found")
+        result["valid"] = False
+        return result
+
+    draft_id_to_domain = _load_sources_yaml(draft_path)
+    sot_id_to_domain = _load_sources_yaml(sot_path)
+
+    draft_domains = set(draft_id_to_domain.values()) if draft_id_to_domain else set()
+    sot_domains = set(sot_id_to_domain.values()) if sot_id_to_domain else set()
+
+    if not draft_domains:
+        result["warnings"].append("SS4: No domains extracted from config/sources.yaml")
+        result["valid"] = False
+        return result
+
+    if not sot_domains:
+        result["warnings"].append("SS4: No domains extracted from data/config/sources.yaml")
+        result["valid"] = False
+        return result
+
+    in_draft_only = draft_domains - sot_domains
+    in_sot_only = sot_domains - draft_domains
+
+    if in_draft_only or in_sot_only:
+        result["valid"] = False
+        if in_draft_only:
+            result["warnings"].append(
+                f"SS4: {len(in_draft_only)} domains in config/ but not in data/config/: "
+                f"{sorted(in_draft_only)}"
+            )
+        if in_sot_only:
+            result["warnings"].append(
+                f"SS4: {len(in_sot_only)} domains in data/config/ but not in config/: "
+                f"{sorted(in_sot_only)}"
+            )
+
+    result["draft_count"] = len(draft_domains)
+    result["sot_count"] = len(sot_domains)
+
+    return result
+
+
+# ---------------------------------------------------------------------------
 # Main logic
 # ---------------------------------------------------------------------------
 
@@ -250,6 +317,13 @@ def verify_coverage(project_dir: Path) -> dict:
     total_covered = len(covered_ids)
     coverage_pct = (total_covered / total_expected * 100) if total_expected > 0 else 0.0
 
+    # ------------------------------------------------------------------
+    # SS4: Check config/sources.yaml ↔ data/config/sources.yaml sync
+    # ------------------------------------------------------------------
+    ss4_result = _check_config_sync(project_dir)
+    if ss4_result["warnings"]:
+        warnings.extend(ss4_result["warnings"])
+
     result = {
         "valid": len(errors) == 0 and len(missing_ids) == 0,
         "summary": {
@@ -270,6 +344,7 @@ def verify_coverage(project_dir: Path) -> dict:
         },
         "adapter_count": len(adapter_files),
         "registry_entries": len(registry),
+        "ss4_config_sync": ss4_result,
         "warnings": warnings,
         "errors": errors,
     }

@@ -373,6 +373,22 @@ class CircuitBreaker:
             self._failure_count = 0
             self._success_count = 0
 
+    def force_half_open(self) -> None:
+        """Force circuit to HALF_OPEN state for immediate probe.
+
+        Used by the Crawling Absolute Principle (크롤링 절대 원칙):
+        when circuit is OPEN, bypass the recovery_timeout and immediately
+        allow a probe request with escalated anti-block strategy.
+        """
+        with self._lock:
+            if self._state == CircuitState.OPEN:
+                self._state = CircuitState.HALF_OPEN
+                self._success_count = 0
+                logger.info(
+                    "Circuit breaker force-half-opened (never-abandon policy)",
+                    extra={"circuit_name": self.name},
+                )
+
     def __repr__(self) -> str:
         return (f"CircuitBreaker(name={self.name!r}, state={self._state.value}, "
                 f"failures={self._failure_count})")

@@ -2,247 +2,654 @@ _meta:
   version: 1.0.0-draft
   generated_by: generate_sources_yaml_draft.py
   description: News sources configuration — auto-generated draft from site reconnaissance
-  total_sites: 44
+  total_sites: 121
 sources:
+- domain: 38north.org
+  name: 38 North
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: abc.es
+  name: ABC Spain
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: afmedios.com
+  name: AF Medios
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: africanews.com
+  name: Africanews
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: aftonbladet.se
+  name: Aftonbladet
+  language: sv
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: aljazeera.com
+  name: Al Jazeera English
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: allafrica.com
+  name: AllAfrica
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: al-monitor.com
+  name: Al-Monitor
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: ansa.it
+  name: ANSA
+  language: it
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: en.antaranews.com
+  name: Antara News
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: arabnews.com
+  name: Arab News
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: asahi.com
+  name: Asahi Shimbun
+  language: ja
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: balkaninsight.com
+  name: Balkan Insight (BIRN)
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: bbc.com
+  name: BBC News
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: bild.de
+  name: Bild
+  language: de
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: biobiochile.cl
+  name: BioBioChile
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: bloomberg.com
+  name: Bloomberg
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: bloter.net
+  name: Bloter
+  language: ko
+  crawl_method: headless
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: buzzfeed.com
+  name: BuzzFeed
+  language: en
+  crawl_method: headless
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: centraleuropeantimes.com
+  name: Central European Times
+  language: en
+  crawl_method: rss+dom
+  anti_block_tier: 1
 - domain: chosun.com
   name: Chosun Ilbo
   language: ko
-  crawl_method: rss+html
+  crawl_method: rss+sitemap
   anti_block_tier: 2
   ua_rotation: false
-- domain: joongang.co.kr
-  name: JoongAng Ilbo
-  language: ko
-  crawl_method: rss+html
+- domain: clarin.com
+  name: Clarin
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: edition.cnn.com
+  name: CNN
+  language: en
+  crawl_method: sitemap+dom
   anti_block_tier: 3
   ua_rotation: false
+- domain: corriere.it
+  name: Corriere della Sera
+  language: it
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
 - domain: donga.com
   name: Dong-A Ilbo
   language: ko
-  crawl_method: rss+html
+  crawl_method: rss+sitemap
   anti_block_tier: 2
   ua_rotation: false
+- domain: economictimes.indiatimes.com
+  name: Economic Times India
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: elcomercio.pe
+  name: El Comercio Peru
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: digital.elmercurio.com
+  name: El Mercurio
+  language: es
+  crawl_method: dom+sitemap
+  anti_block_tier: 3
+- domain: elmundo.es
+  name: El Mundo
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: elpais.com
+  name: El Pais
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: eltiempo.com
+  name: El Tiempo
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: etnews.com
+  name: Electronic Times
+  language: ko
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: euractiv.com
+  name: Euractiv
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: euronews.com
+  name: Euronews
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: faz.net
+  name: Frankfurter Allgemeine
+  language: de
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: fnnews.com
+  name: Financial News
+  language: ko
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: focustaiwan.tw
+  name: Focus Taiwan
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: folha.uol.com.br
+  name: Folha de S.Paulo
+  language: pt
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: france24.com
+  name: France 24
+  language: fr
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: ft.com
+  name: Financial Times
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: globaltimes.cn
+  name: Global Times
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: mongolia.gogo.mn
+  name: GoGo Mongolia
+  language: mn
+  crawl_method: rss+dom
+  anti_block_tier: 1
+- domain: haaretz.com
+  name: Haaretz
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
 - domain: hani.co.kr
   name: Hankyoreh
   language: ko
-  crawl_method: rss+html
-  anti_block_tier: 1
-  ua_rotation: false
-- domain: yna.co.kr
-  name: Yonhap News
-  language: ko
-  crawl_method: rss+api
+  crawl_method: rss+sitemap
   anti_block_tier: 2
-  ua_rotation: false
-- domain: mk.co.kr
-  name: Maeil Business
-  language: ko
-  crawl_method: rss+html
-  anti_block_tier: 3
   ua_rotation: false
 - domain: hankyung.com
   name: Korea Economic Daily
   language: ko
-  crawl_method: rss+html
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: hindustantimes.com
+  name: Hindustan Times
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: huffpost.com
+  name: HuffPost
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: icelandmonitor.mbl.is
+  name: Iceland Monitor
+  language: en
+  crawl_method: rss+dom
+  anti_block_tier: 1
+- domain: idnes.cz
+  name: iDNES
+  language: cs
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: indianexpress.com
+  name: Indian Express
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: inquirer.net
+  name: Philippine Daily Inquirer
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: insight.co.kr
+  name: Insight Korea
+  language: ko
+  crawl_method: rss+dom
+  anti_block_tier: 2
+- domain: intellinews.com
+  name: Intellinews
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: investing.com
+  name: Investing.com
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: irobotnews.com
+  name: iRobot News
+  language: ko
+  crawl_method: rss+sitemap
   anti_block_tier: 3
   ua_rotation: false
-- domain: fnnews.com
-  name: Financial News
+- domain: israelhayom.com
+  name: Israel Hayom
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: thejakartapost.com
+  name: The Jakarta Post
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: joongang.co.kr
+  name: JoongAng Ilbo
   language: ko
-  crawl_method: rss+html
+  crawl_method: dom+sitemap
   anti_block_tier: 3
+  ua_rotation: false
+- domain: jordantimes.com
+  name: Jordan Times
+  language: en
+  crawl_method: rss+dom
+  anti_block_tier: 1
+- domain: jpost.com
+  name: Jerusalem Post
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: kmib.co.kr
+  name: Kookmin Ilbo
+  language: ko
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: lanacion.com.ar
+  name: La Nacion Argentina
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: latimes.com
+  name: Los Angeles Times
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: lavanguardia.com
+  name: La Vanguardia
+  language: es
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: lefigaro.fr
+  name: Le Figaro
+  language: fr
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: lemonde.fr
+  name: Le Monde
+  language: fr
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: liberation.fr
+  name: Liberation
+  language: fr
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: mainichi.jp
+  name: Mainichi Shimbun
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: mb.com.ph
+  name: Manila Bulletin
+  language: en
+  crawl_method: rss+dom
+  anti_block_tier: 3
+- domain: marketwatch.com
+  name: MarketWatch
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: middleeasteye.net
+  name: Middle East Eye
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: mk.co.kr
+  name: Maeil Business Newspaper
+  language: ko
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
   ua_rotation: false
 - domain: mt.co.kr
   name: Money Today
   language: ko
-  crawl_method: rss+html
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: nationalpost.com
+  name: National Post
+  language: en
+  crawl_method: rss+sitemap
   anti_block_tier: 3
   ua_rotation: false
+- domain: natureasia.com
+  name: Nature Asia
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
 - domain: nocutnews.co.kr
   name: NoCut News
   language: ko
-  crawl_method: rss+html
+  crawl_method: rss+sitemap
   anti_block_tier: 1
   ua_rotation: false
-- domain: kmib.co.kr
-  name: Kookmin Ilbo
+- domain: nytimes.com
+  name: The New York Times
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: oglobo.globo.com
+  name: O Globo
+  language: pt
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: ohmynews.com
+  name: OhmyNews
   language: ko
-  crawl_method: rss+html
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: ouest-france.fr
+  name: Ouest-France
+  language: fr
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: panapress.com
+  name: Panapress
+  language: en
+  crawl_method: rss+dom
+  anti_block_tier: 1
+- domain: pap.pl
+  name: Polish Press Agency
+  language: pl
+  crawl_method: rss+dom
+  anti_block_tier: 1
+- domain: people.com.cn
+  name: People's Daily
+  language: zh
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: philstar.com
+  name: PhilStar
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: politico.eu
+  name: Politico Europe
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: qz.com
+  name: Quartz
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: rbc.ru
+  name: RBC
+  language: ru
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: repubblica.it
+  name: La Repubblica
+  language: it
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: rg.ru
+  name: Rossiyskaya Gazeta
+  language: ru
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: ria.ru
+  name: RIA Novosti
+  language: ru
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: sciencetimes.co.kr
+  name: Science Times
+  language: ko
+  crawl_method: sitemap+rss
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: scmp.com
+  name: South China Morning Post
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: spiegel.de
+  name: Der Spiegel
+  language: de
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: stratechery.com
+  name: Stratechery
+  language: en
+  crawl_method: rss+dom
+  anti_block_tier: 1
+- domain: sueddeutsche.de
+  name: Sueddeutsche Zeitung
+  language: de
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: taipeitimes.com
+  name: Taipei Times
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: taiwannews.com.tw
+  name: Taiwan News
+  language: en
+  crawl_method: headless
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: techmeme.com
+  name: Techmeme
+  language: en
+  crawl_method: rss+dom
+  anti_block_tier: 1
+- domain: techneedle.com
+  name: TechNeedle
+  language: ko
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: telegraph.co.uk
+  name: The Telegraph
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+- domain: en.tempo.co
+  name: Tempo Indonesia
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: theafricareport.com
+  name: The Africa Report
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: theguardian.com
+  name: The Guardian
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: thehindu.com
+  name: The Hindu
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: themoscowtimes.com
+  name: The Moscow Times
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: thesun.co.uk
+  name: The Sun
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: thetimes.com
+  name: The Times
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+- domain: timesofindia.indiatimes.com
+  name: Times of India
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: tv2.no
+  name: TV2 Norway
+  language: 'no'
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+- domain: vietnamnews.vn
+  name: Vietnam News
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: e.vnexpress.net
+  name: VnExpress International
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: voakorea.com
+  name: VOA Korea
+  language: ko
+  crawl_method: api+sitemap
+  anti_block_tier: 1
+  ua_rotation: false
+- domain: welt.de
+  name: Die Welt
+  language: de
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: wired.com
+  name: Wired
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 3
+- domain: wsj.com
+  name: Wall Street Journal
+  language: en
+  crawl_method: sitemap+dom
+  anti_block_tier: 3
+  ua_rotation: false
+- domain: wyborcza.pl
+  name: Gazeta Wyborcza
+  language: pl
+  crawl_method: rss+dom
+  anti_block_tier: 2
+- domain: news.yahoo.co.jp
+  name: Yahoo Japan News
+  language: ja
+  crawl_method: rss+dom
+  anti_block_tier: 3
+- domain: yle.fi
+  name: YLE News
+  language: en
+  crawl_method: rss+sitemap
+  anti_block_tier: 1
+- domain: yna.co.kr
+  name: Yonhap News Agency
+  language: ko
+  crawl_method: rss+sitemap
+  anti_block_tier: 2
+  ua_rotation: false
+- domain: yomiuri.co.jp
+  name: Yomiuri Shimbun
+  language: ja
+  crawl_method: rss+sitemap
   anti_block_tier: 3
   ua_rotation: false
 - domain: zdnet.co.kr
   name: ZDNet Korea
   language: ko
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: itworld.co.kr
-  name: IT World Korea
-  language: ko
-  crawl_method: rss+html
-  anti_block_tier: 1
-- domain: bloter.net
-  name: Bloter
-  language: ko
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: etnews.com
-  name: Electronic Times
-  language: ko
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: ddaily.co.kr
-  name: Digital Daily
-  language: ko
-  crawl_method: rss+html
-  anti_block_tier: 1
-- domain: aitimes.com
-  name: AI Times
-  language: ko
-  crawl_method: rss+html
-  anti_block_tier: 1
-- domain: techm.kr
-  name: TechM
-  language: ko
-  crawl_method: html
-  anti_block_tier: 1
-- domain: byline.network
-  name: Byline Network
-  language: ko
-  crawl_method: rss+html
-  anti_block_tier: 1
-- domain: reuters.com
-  name: Reuters
-  language: en
-  crawl_method: rss+api
-  anti_block_tier: 3
-- domain: apnews.com
-  name: AP News
-  language: en
-  crawl_method: rss+api
-  anti_block_tier: 2
-- domain: wsj.com
-  name: Wall Street Journal
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: nytimes.com
-  name: New York Times
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: washingtonpost.com
-  name: Washington Post
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 3
-- domain: ft.com
-  name: Financial Times
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: economist.com
-  name: The Economist
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 3
-- domain: bbc.com
-  name: BBC News
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: theguardian.com
-  name: The Guardian
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: cnn.com
-  name: CNN
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: aljazeera.com
-  name: Al Jazeera English
-  language: en
-  crawl_method: rss+html
+  crawl_method: rss+sitemap
   anti_block_tier: 2
   ua_rotation: false
-- domain: bloomberg.com
-  name: Bloomberg
-  language: en
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: nhk.or.jp
-  name: NHK News Web
-  language: ja
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: asahi.com
-  name: Asahi Shimbun
-  language: ja
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: nikkei.com
-  name: Nikkei
-  language: ja
-  crawl_method: rss+html
-  anti_block_tier: 3
-- domain: xinhuanet.com
-  name: Xinhua News
-  language: zh
-  crawl_method: html
-  anti_block_tier: 2
-- domain: scmp.com
-  name: South China Morning Post
-  language: zh
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: caixin.com
-  name: Caixin
-  language: zh
-  crawl_method: html
-  anti_block_tier: 2
-- domain: aljazeera.net
-  name: Al Jazeera Arabic
-  language: ar
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: alarabiya.net
-  name: Al Arabiya
-  language: ar
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: lemonde.fr
-  name: Le Monde
-  language: fr
-  crawl_method: rss+html
-  anti_block_tier: 3
-  ua_rotation: false
-- domain: spiegel.de
-  name: Der Spiegel
-  language: de
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: elpais.com
-  name: El Pais
-  language: es
-  crawl_method: rss+html
-  anti_block_tier: 2
-- domain: tass.com
-  name: TASS
-  language: ru
-  crawl_method: html
-  anti_block_tier: 2
-- domain: afp.com
-  name: Agence France-Presse
-  language: fr
-  crawl_method: rss+html
-  anti_block_tier: 2

@@ -4,7 +4,7 @@ Tests verify:
 - Site count per group matches adapter agent definitions
 - Canonical domains are present in each group
 - No duplicate domains across groups
-- Total sites = 44
+- Total sites = 121
 - Distribution output format
 """
 
@@ -21,23 +21,23 @@ import pytest
 class TestSiteGroupCounts:
     """Verify each group has the exact count matching adapter agents."""
 
-    def test_kr_major_count_is_11(self, distribute_mod):
-        assert len(distribute_mod._DEFAULT_GROUPS["kr-major"]) == 11
+    def test_kr_major_count_is_12(self, distribute_mod):
+        assert len(distribute_mod._FALLBACK_GROUPS["kr-major"]) == 12
 
-    def test_kr_tech_count_is_8(self, distribute_mod):
-        assert len(distribute_mod._DEFAULT_GROUPS["kr-tech"]) == 8
+    def test_kr_tech_count_is_10(self, distribute_mod):
+        assert len(distribute_mod._FALLBACK_GROUPS["kr-tech"]) == 10
 
-    def test_english_count_is_12(self, distribute_mod):
-        assert len(distribute_mod._DEFAULT_GROUPS["english"]) == 12
+    def test_english_count_is_22(self, distribute_mod):
+        assert len(distribute_mod._FALLBACK_GROUPS["english"]) == 22
 
-    def test_multilingual_count_is_13(self, distribute_mod):
-        assert len(distribute_mod._DEFAULT_GROUPS["multilingual"]) == 13
+    def test_multilingual_count_is_77(self, distribute_mod):
+        assert len(distribute_mod._FALLBACK_GROUPS["multilingual"]) == 77
 
-    def test_total_sites_is_44(self, distribute_mod):
+    def test_total_sites_is_121(self, distribute_mod):
         total = sum(
-            len(sites) for sites in distribute_mod._DEFAULT_GROUPS.values()
+            len(sites) for sites in distribute_mod._FALLBACK_GROUPS.values()
         )
-        assert total == 44
+        assert total == 121
 
 
 # ============================================================================
@@ -48,7 +48,7 @@ class TestCanonicalDomains:
     """Verify each group contains the correct domains per adapter agent spec."""
 
     def _domains(self, mod, group_key):
-        return {s["domain"] for s in mod._DEFAULT_GROUPS[group_key]}
+        return {s["domain"] for s in mod._FALLBACK_GROUPS[group_key]}
 
     def test_kr_major_group_a_dailies(self, distribute_mod):
         """Group A — Korean Major Dailies (5)."""
@@ -63,59 +63,73 @@ class TestCanonicalDomains:
         assert expected_b.issubset(domains)
 
     def test_kr_major_group_c_niche(self, distribute_mod):
-        """Group C — Korean Niche (2)."""
+        """Group C — Korean Niche (3)."""
         domains = self._domains(distribute_mod, "kr-major")
-        expected_c = {"nocutnews.co.kr", "kmib.co.kr"}
+        expected_c = {"nocutnews.co.kr", "kmib.co.kr", "ohmynews.com"}
         assert expected_c.issubset(domains)
 
     def test_kr_tech_domains(self, distribute_mod):
-        """Group D — Korean IT/Tech (8) per adapter-dev-kr-tech.md."""
+        """Group D — Korean IT/Tech (10) per kr_tech adapter registry."""
         domains = self._domains(distribute_mod, "kr-tech")
         expected = {
-            "zdnet.co.kr", "itworld.co.kr", "bloter.net", "etnews.com",
-            "ddaily.co.kr", "aitimes.com", "techm.kr", "byline.network",
+            "38north.org", "bloter.net", "etnews.com", "sciencetimes.co.kr",
+            "zdnet.co.kr", "irobotnews.com", "techneedle.com",
+            "insight.co.kr", "stratechery.com", "techmeme.com",
         }
-        assert domains == expected
-
-    def test_english_api_sites(self, distribute_mod):
-        """English API-based sites: Reuters, AP."""
-        domains = self._domains(distribute_mod, "english")
-        assert {"reuters.com", "apnews.com"}.issubset(domains)
-
-    def test_english_paywall_sites(self, distribute_mod):
-        """English paywall sites: WSJ, NYT, WashPost, FT, Economist."""
-        domains = self._domains(distribute_mod, "english")
-        expected = {"wsj.com", "nytimes.com", "washingtonpost.com", "ft.com", "economist.com"}
         assert expected.issubset(domains)
 
-    def test_english_html_sites(self, distribute_mod):
-        """English HTML sites: BBC, Guardian, CNN, Al Jazeera English, Bloomberg."""
+    def test_english_key_sites(self, distribute_mod):
+        """English key sites: NYT, WSJ, FT, CNN, Bloomberg."""
         domains = self._domains(distribute_mod, "english")
-        expected = {"bbc.com", "theguardian.com", "cnn.com", "aljazeera.com", "bloomberg.com"}
+        expected = {"nytimes.com", "wsj.com", "ft.com", "bloomberg.com"}
+        assert expected.issubset(domains)
+
+    def test_english_new_sites(self, distribute_mod):
+        """Newly added English sites: BBC, Guardian, Wired, etc."""
+        domains = self._domains(distribute_mod, "english")
+        expected = {"bbc.com", "theguardian.com", "wired.com", "politico.eu"}
         assert expected.issubset(domains)
 
     def test_multilingual_japanese(self, distribute_mod):
-        """CJK Japanese sites (3)."""
+        """Asia-Pacific Japanese sites."""
         domains = self._domains(distribute_mod, "multilingual")
-        expected = {"nhk.or.jp", "asahi.com", "nikkei.com"}
+        expected = {"yomiuri.co.jp", "asahi.com", "mainichi.jp"}
         assert expected.issubset(domains)
 
     def test_multilingual_chinese(self, distribute_mod):
-        """CJK Chinese sites (3)."""
+        """Asia-Pacific Chinese sites."""
         domains = self._domains(distribute_mod, "multilingual")
-        expected = {"xinhuanet.com", "scmp.com", "caixin.com"}
+        expected = {"people.com.cn", "scmp.com", "globaltimes.cn"}
         assert expected.issubset(domains)
 
-    def test_multilingual_arabic(self, distribute_mod):
-        """RTL Arabic sites (2)."""
+    def test_multilingual_german(self, distribute_mod):
+        """European German-language sites."""
         domains = self._domains(distribute_mod, "multilingual")
-        expected = {"aljazeera.net", "alarabiya.net"}
+        expected = {"bild.de", "spiegel.de", "sueddeutsche.de", "welt.de", "faz.net"}
         assert expected.issubset(domains)
 
     def test_multilingual_european(self, distribute_mod):
-        """European sites (5)."""
+        """European non-German sites."""
         domains = self._domains(distribute_mod, "multilingual")
-        expected = {"lemonde.fr", "spiegel.de", "elpais.com", "tass.com", "afp.com"}
+        expected = {"lemonde.fr", "elpais.com", "corriere.it", "repubblica.it"}
+        assert expected.issubset(domains)
+
+    def test_multilingual_africa(self, distribute_mod):
+        """Group H — Africa (4)."""
+        domains = self._domains(distribute_mod, "multilingual")
+        expected = {"allafrica.com", "africanews.com", "theafricareport.com", "panapress.com"}
+        assert expected.issubset(domains)
+
+    def test_multilingual_latam(self, distribute_mod):
+        """Group I — Latin America (8)."""
+        domains = self._domains(distribute_mod, "multilingual")
+        expected = {"clarin.com", "folha.uol.com.br", "eltiempo.com"}
+        assert expected.issubset(domains)
+
+    def test_multilingual_russia(self, distribute_mod):
+        """Group J — Russia/Central Asia (4)."""
+        domains = self._domains(distribute_mod, "multilingual")
+        expected = {"ria.ru", "rg.ru", "rbc.ru"}
         assert expected.issubset(domains)
 
 
@@ -128,7 +142,7 @@ class TestNoDuplicates:
 
     def test_no_duplicate_domains_across_groups(self, distribute_mod):
         all_domains = []
-        for group_key, sites in distribute_mod._DEFAULT_GROUPS.items():
+        for group_key, sites in distribute_mod._FALLBACK_GROUPS.items():
             for site in sites:
                 all_domains.append((site["domain"], group_key))
 
@@ -137,7 +151,7 @@ class TestNoDuplicates:
         assert len(duplicates) == 0, f"Duplicate domains: {set(duplicates)}"
 
     def test_no_duplicate_domains_within_group(self, distribute_mod):
-        for group_key, sites in distribute_mod._DEFAULT_GROUPS.items():
+        for group_key, sites in distribute_mod._FALLBACK_GROUPS.items():
             domains = [s["domain"] for s in sites]
             assert len(domains) == len(set(domains)), \
                 f"Duplicates within {group_key}: {[d for d in domains if domains.count(d) > 1]}"
@@ -152,11 +166,10 @@ class TestDistributeOutput:
 
     def test_distribute_creates_output_files(self, distribute_mod, tmp_path):
         """Distribution should create 4 JSON files."""
-        # Create minimal project structure
         from pathlib import Path
         result = distribute_mod.distribute_sites(Path(tmp_path))
         assert result["valid"] is True
-        assert result["total_sites"] == 44
+        assert result["total_sites"] == 121
 
         for group in ["kr-major", "kr-tech", "english", "multilingual"]:
             assert group in result["output_paths"]
@@ -177,7 +190,7 @@ class TestDistributeOutput:
 
     def test_all_sites_have_domain_and_name(self, distribute_mod):
         """Every site entry must have domain and name fields."""
-        for group_key, sites in distribute_mod._DEFAULT_GROUPS.items():
+        for group_key, sites in distribute_mod._FALLBACK_GROUPS.items():
             for site in sites:
                 assert "domain" in site, f"Missing domain in {group_key}: {site}"
                 assert "name" in site, f"Missing name in {group_key}: {site}"

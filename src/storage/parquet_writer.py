@@ -118,14 +118,17 @@ SIGNALS_PA_SCHEMA = pa.schema([
 ])
 
 # topics.parquet -- Stage 4 output (Step 7 design Section 3.4)
+# published_at and source propagated from articles.parquet for Stage 7 signal classification
 TOPICS_PA_SCHEMA = pa.schema([
-    pa.field("article_id",         pa.utf8(),    nullable=False),
-    pa.field("topic_id",           pa.int32(),   nullable=False),
-    pa.field("topic_label",        pa.utf8(),    nullable=True),
-    pa.field("topic_probability",  pa.float32(), nullable=True),
-    pa.field("hdbscan_cluster_id", pa.int32(),   nullable=True),
-    pa.field("nmf_topic_id",       pa.int32(),   nullable=True),
-    pa.field("lda_topic_id",       pa.int32(),   nullable=True),
+    pa.field("article_id",         pa.utf8(),                    nullable=False),
+    pa.field("topic_id",           pa.int32(),                   nullable=False),
+    pa.field("topic_label",        pa.utf8(),                    nullable=True),
+    pa.field("topic_probability",  pa.float32(),                 nullable=True),
+    pa.field("hdbscan_cluster_id", pa.int32(),                   nullable=True),
+    pa.field("nmf_topic_id",       pa.int32(),                   nullable=True),
+    pa.field("lda_topic_id",       pa.int32(),                   nullable=True),
+    pa.field("published_at",       pa.timestamp("us", tz="UTC"), nullable=True),
+    pa.field("source",             pa.utf8(),                    nullable=True),
 ])
 
 # Registry: table_name -> (pa.Schema, row_group_size)

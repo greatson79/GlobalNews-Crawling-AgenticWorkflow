@@ -1,10 +1,10 @@
 {
-  "generated": "2026-02-26T05:01:58Z",
+  "generated": "2026-03-11T11:29:04Z",
   "strategy_group": "multilingual",
-  "description": "Asia-Pacific + Europe/Middle East multilingual sites",
+  "description": "Asia-Pacific + Europe/ME + Africa + Latin America + Russia/Central Asia multilingual sites",
   "assigned_agent": "@crawl-strategist-asia + @crawl-strategist-global",
-  "focus_areas": "Character encoding, RTL text, geo-blocking, multi-language sections",
-  "site_count": 13,
+  "focus_areas": "Character encoding, RTL text, geo-blocking, multi-language sections, Spanish/Portuguese/Russian",
+  "site_count": 77,
   "sites": [
     {
       "domain": "people.com.cn",
@@ -43,7 +43,7 @@
       "language": "ja",
       "group": "F",
       "label": "Asia-Pacific",
-      "notes": "Japanese encoding (Shift_JIS/UTF-8)",
+      "notes": "Japanese encoding",
       "recon_row": "| yomiuri.co.jp | Japanese proxy + Japanese NLP |"
     },
     {
@@ -53,6 +53,126 @@
       "label": "Asia-Pacific",
       "notes": "",
       "recon_row": "| 37 | thehindu.com | Y — /rss | Y — /sitemap.xml | SSR | soft-metered | HIGH | en | ~15 | ~100 | Medium |"
+    },
+    {
+      "domain": "mainichi.jp",
+      "language": "ja",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Japanese"
+    },
+    {
+      "domain": "asahi.com",
+      "language": "ja",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Japanese"
+    },
+    {
+      "domain": "yahoo.co.jp",
+      "language": "ja",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Japanese news portal"
+    },
+    {
+      "domain": "timesofindia.indiatimes.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Indian English"
+    },
+    {
+      "domain": "hindustantimes.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Indian English"
+    },
+    {
+      "domain": "economictimes.indiatimes.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Indian business"
+    },
+    {
+      "domain": "indianexpress.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Indian English"
+    },
+    {
+      "domain": "philstar.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Philippines"
+    },
+    {
+      "domain": "mb.com.ph",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Philippines Manila Bulletin",
+      "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
+    },
+    {
+      "domain": "inquirer.net",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Philippines"
+    },
+    {
+      "domain": "thejakartapost.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Indonesia"
+    },
+    {
+      "domain": "antaranews.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Indonesia Antara"
+    },
+    {
+      "domain": "tempo.co",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Indonesia"
+    },
+    {
+      "domain": "focustaiwan.tw",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Taiwan CNA"
+    },
+    {
+      "domain": "taipeitimes.com",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Taiwan"
+    },
+    {
+      "domain": "vnexpress.net",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Vietnam English edition"
+    },
+    {
+      "domain": "vietnamnews.vn",
+      "language": "en",
+      "group": "F",
+      "label": "Asia-Pacific",
+      "notes": "Vietnam"
     },
     {
       "domain": "thesun.co.uk",
@@ -67,7 +187,7 @@
       "language": "de",
       "group": "G",
       "label": "Europe/Middle East",
-      "notes": "German-language",
+      "notes": "German",
       "recon_row": "| bild.de | German IP preference |"
     },
     {
@@ -75,7 +195,7 @@
       "language": "fr",
       "group": "G",
       "label": "Europe/Middle East",
-      "notes": "French, /en/ section for English",
+      "notes": "French",
       "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
     },
     {
@@ -109,6 +229,337 @@
       "label": "Europe/Middle East",
       "notes": "Hebrew+English, potential RTL",
       "recon_row": "| 44 | israelhayom.com | Y — /feed (WordPress) | Y — /sitemap.xml | SSR (WordPress) | none | LOW | en | ~5 | ~30 | Easy |"
+    },
+    {
+      "domain": "euronews.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Multilingual"
+    },
+    {
+      "domain": "spiegel.de",
+      "language": "de",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "German"
+    },
+    {
+      "domain": "sueddeutsche.de",
+      "language": "de",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "German"
+    },
+    {
+      "domain": "welt.de",
+      "language": "de",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "German"
+    },
+    {
+      "domain": "faz.net",
+      "language": "de",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "German"
+    },
+    {
+      "domain": "corriere.it",
+      "language": "it",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Italian"
+    },
+    {
+      "domain": "repubblica.it",
+      "language": "it",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Italian"
+    },
+    {
+      "domain": "ansa.it",
+      "language": "it",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Italian wire service"
+    },
+    {
+      "domain": "elpais.com",
+      "language": "es",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Spanish"
+    },
+    {
+      "domain": "elmundo.es",
+      "language": "es",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Spanish"
+    },
+    {
+      "domain": "abc.es",
+      "language": "es",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Spanish"
+    },
+    {
+      "domain": "lavanguardia.com",
+      "language": "es",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Spanish"
+    },
+    {
+      "domain": "lefigaro.fr",
+      "language": "fr",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "French"
+    },
+    {
+      "domain": "liberation.fr",
+      "language": "fr",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "French"
+    },
+    {
+      "domain": "france24.com",
+      "language": "fr",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "French multilingual"
+    },
+    {
+      "domain": "ouest-france.fr",
+      "language": "fr",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "French regional"
+    },
+    {
+      "domain": "wyborcza.pl",
+      "language": "pl",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Polish"
+    },
+    {
+      "domain": "pap.pl",
+      "language": "pl",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Polish wire service"
+    },
+    {
+      "domain": "idnes.cz",
+      "language": "cs",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Czech"
+    },
+    {
+      "domain": "intellinews.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Eastern Europe focus"
+    },
+    {
+      "domain": "balkaninsight.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Balkans focus"
+    },
+    {
+      "domain": "centraleuropeantimes.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Central Europe"
+    },
+    {
+      "domain": "aftonbladet.se",
+      "language": "sv",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Swedish"
+    },
+    {
+      "domain": "tv2.no",
+      "language": "no",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Norwegian"
+    },
+    {
+      "domain": "yle.fi",
+      "language": "fi",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Finnish",
+      "recon_row": "| Hard | 11 | joongang.co.kr, bloter.net, sciencetimes.co.kr, irobotnews.com, techneedle.com, marketwatch.com, buzzfeed.com (NOTE: BuzzFeed News shut down April 2023 — entertainment/lifestyle only), nationalpost.com, yomiuri.co.jp, thesun.co.uk, bild.de |"
+    },
+    {
+      "domain": "icelandmonitor.mbl.is",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Icelandic English"
+    },
+    {
+      "domain": "middleeasteye.net",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Middle East focus"
+    },
+    {
+      "domain": "al-monitor.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Middle East focus"
+    },
+    {
+      "domain": "haaretz.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Israeli English"
+    },
+    {
+      "domain": "jpost.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Israeli English"
+    },
+    {
+      "domain": "jordantimes.com",
+      "language": "en",
+      "group": "G",
+      "label": "Europe/Middle East",
+      "notes": "Jordanian English"
+    },
+    {
+      "domain": "allafrica.com",
+      "language": "en",
+      "group": "H",
+      "label": "Africa",
+      "notes": "Pan-African aggregator"
+    },
+    {
+      "domain": "africanews.com",
+      "language": "en",
+      "group": "H",
+      "label": "Africa",
+      "notes": "Euronews Africa"
+    },
+    {
+      "domain": "theafricareport.com",
+      "language": "en",
+      "group": "H",
+      "label": "Africa",
+      "notes": ""
+    },
+    {
+      "domain": "panapress.com",
+      "language": "en",
+      "group": "H",
+      "label": "Africa",
+      "notes": "Pan-African wire"
+    },
+    {
+      "domain": "clarin.com",
+      "language": "es",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Argentine Spanish"
+    },
+    {
+      "domain": "lanacion.com.ar",
+      "language": "es",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Argentine Spanish"
+    },
+    {
+      "domain": "folha.uol.com.br",
+      "language": "pt",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Brazilian Portuguese"
+    },
+    {
+      "domain": "oglobo.globo.com",
+      "language": "pt",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Brazilian Portuguese"
+    },
+    {
+      "domain": "elmercurio.com",
+      "language": "es",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Chilean Spanish"
+    },
+    {
+      "domain": "biobiochile.cl",
+      "language": "es",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Chilean Spanish"
+    },
+    {
+      "domain": "eltiempo.com",
+      "language": "es",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Colombian Spanish"
+    },
+    {
+      "domain": "elcomercio.pe",
+      "language": "es",
+      "group": "I",
+      "label": "Latin America",
+      "notes": "Peruvian Spanish"
+    },
+    {
+      "domain": "gogo.mn",
+      "language": "mn",
+      "group": "J",
+      "label": "Russia/Central Asia",
+      "notes": "Mongolian"
+    },
+    {
+      "domain": "ria.ru",
+      "language": "ru",
+      "group": "J",
+      "label": "Russia/Central Asia",
+      "notes": "Russian state media"
+    },
+    {
+      "domain": "rg.ru",
+      "language": "ru",
+      "group": "J",
+      "label": "Russia/Central Asia",
+      "notes": "Russian government",
+      "recon_row": "| nytimes.com, ft.com, wsj.com, bloomberg.com, lemonde.fr | Subscriber credentials OR accept title-only |"
+    },
+    {
+      "domain": "rbc.ru",
+      "language": "ru",
+      "group": "J",
+      "label": "Russia/Central Asia",
+      "notes": "Russian business"
     }
   ]
 }
