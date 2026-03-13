@@ -49,6 +49,8 @@ data/logs/
 
 # Keep config files tracked
 !data/config/
+# Runtime learning state (not version-controlled config)
+data/config/bypass_state.json
 
 # IDE
 .vscode/

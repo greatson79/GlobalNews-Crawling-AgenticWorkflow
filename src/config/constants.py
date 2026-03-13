@@ -101,6 +101,16 @@ CRAWL_LOOKBACK_HOURS = 24
 # escalation instead of skipping the site entirely.
 CRAWL_NEVER_ABANDON = True
 
+# Maximum bypass discovery attempts per feed URL when normal discovery is blocked.
+DISCOVERY_BYPASS_MAX_ATTEMPTS = 5
+
+# Maximum extra full-site passes after L4 restarts exhaust (outer multi-pass loop).
+# Independent from per-site NEVER_ABANDON_MAX_CYCLES in retry_manager.py.
+MULTI_PASS_MAX_EXTRA = 10
+
+# Bypass state persistence — cross-crawl learning SOT
+BYPASS_STATE_PATH = DATA_CONFIG_DIR / "bypass_state.json"
+
 # User-Agent pool sizes by tier
 UA_TIER_SIZES = {
     1: 1,

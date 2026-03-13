@@ -46,6 +46,8 @@ from src.config.constants import (
     MAX_ARTICLES_PER_SITE_PER_DAY,
     DEFAULT_RATE_LIMIT_SECONDS,
     ENABLED_DEFAULT,
+    DISCOVERY_BYPASS_MAX_ATTEMPTS,
+    BYPASS_STATE_PATH,
 )
 from src.crawling.contracts import RawArticle, CrawlResult, DiscoveredURL
 from src.crawling.network_guard import NetworkGuard
@@ -363,6 +365,9 @@ class CrawlingPipeline:
             enable_browser=self._browser_renderer is not None,
         )
 
+        # Bypass learning state — cross-crawl persistence SOT
+        self._bypass_state: dict[str, Any] = self._load_bypass_state()
+
         # Crawl state (resume support)
         self._crawl_state = CrawlState(self._output_dir)
 
@@ -537,8 +542,11 @@ class CrawlingPipeline:
         # CRAWL_NEVER_ABANDON: after L4 restarts + Never-Abandon loop,
         # re-check for incomplete sites and run additional passes.
         # Sites that yielded their deadline get fresh passes with new deadlines.
+        # Hard cap: MULTI_PASS_MAX_EXTRA passes to prevent infinite loops.
+        from src.config.constants import MULTI_PASS_MAX_EXTRA
+        max_extra_passes = MULTI_PASS_MAX_EXTRA  # 10
         pass_number = L4_MAX_RESTARTS
-        while True:
+        for _ in range(max_extra_passes):
             incomplete = self._get_incomplete_sites(target_sites, all_results)
             if not incomplete:
                 logger.info(
@@ -580,6 +588,11 @@ class CrawlingPipeline:
                 )
                 # Backoff before next attempt
                 time.sleep(min(pass_number * 30, 300))
+        else:
+            # Max passes exhausted — generate failure report for remaining sites
+            final_incomplete = self._get_incomplete_sites(target_sites, all_results)
+            if final_incomplete:
+                self._generate_failure_report(final_incomplete, target_sites, all_results)
 
         return list(all_results.values())
 
@@ -910,8 +923,8 @@ class CrawlingPipeline:
                     pub_dt = pub_dt.replace(tzinfo=timezone.utc)
                 if pub_dt < self._lookback_cutoff:
                     logger.debug(
-                        "bypass_article_outside_24h url=%s published_at=%s",
-                        url[:80], pub_dt.isoformat(),
+                        "bypass_article_outside_24h site_id=%s url=%s published_at=%s",
+                        site_id, url[:80], pub_dt.isoformat(),
                     )
                     return
 
@@ -926,8 +939,8 @@ class CrawlingPipeline:
                 )
                 if dedup_result.is_duplicate:
                     logger.debug(
-                        "bypass_article_deduped url=%s level=%s reason=%s",
-                        url[:80], dedup_result.level, dedup_result.reason[:80],
+                        "bypass_article_deduped site_id=%s url=%s level=%s reason=%s",
+                        site_id, url[:80], dedup_result.level, dedup_result.reason[:80],
                     )
                     return
 
@@ -1408,11 +1421,390 @@ class CrawlingPipeline:
                 site_id, str(last_error)[:200],
             )
 
+        # Bypass fallback: when all normal discovery methods fail,
+        # try DynamicBypassEngine to fetch RSS/sitemap feeds directly.
+        # This handles HTTP 403 blocked sites (Category B).
+        if not discovered and self._bypass_engine is not None:
+            # Determine block type from the last error (deterministic, not guessed)
+            block_type = self._detect_block_type_from_error(last_error)
+
+            discovered = self._discover_via_bypass(
+                site_id, site_cfg, block_type,
+            )
+
+            if discovered:
+                logger.info(
+                    "bypass_discovery_success site_id=%s urls=%s block_type=%s",
+                    site_id, len(discovered),
+                    block_type.value if block_type else "unknown",
+                )
+                # Update bypass_state SOT for cross-crawl learning
+                self._update_bypass_state(site_id, success=True, block_type=block_type)
+            else:
+                self._update_bypass_state(site_id, success=False, block_type=block_type)
+
         logger.info(
             "urls_discovered site_id=%s count=%s",
             site_id, len(discovered),
         )
         return discovered
+
+    # -----------------------------------------------------------------------
+    # Bypass Discovery (Category B — HTTP 403 blocked sites)
+    # -----------------------------------------------------------------------
+
+    def _detect_block_type_from_error(self, error: Exception | None) -> Any:
+        """Extract block type from the last discovery error (deterministic).
+
+        Returns a BlockType enum value from dynamic_bypass, or None if
+        the error is not block-related. NO guessing — only uses information
+        already present in the error object.
+        """
+        if error is None:
+            return None
+
+        from src.crawling.dynamic_bypass import BlockType
+
+        if isinstance(error, BlockDetectedError):
+            # BlockDetectedError carries block_type attribute
+            bt_str = getattr(error, "block_type", None)
+            if bt_str:
+                try:
+                    return BlockType(bt_str)
+                except (ValueError, KeyError):
+                    pass
+            # Infer from error message (deterministic pattern match)
+            msg = str(error).lower()
+            if "captcha" in msg:
+                return BlockType.CAPTCHA
+            if "cloudflare" in msg or "just a moment" in msg:
+                return BlockType.JS_CHALLENGE
+            # No guessing — return None if block type is not deterministic
+            return None
+
+        if isinstance(error, NetworkError):
+            status = getattr(error, "status_code", None)
+            if status == 403:
+                return BlockType.UA_FILTER
+            if status == 429:
+                return BlockType.RATE_LIMIT
+
+        return None
+
+    def _discover_via_bypass(
+        self,
+        site_id: str,
+        site_cfg: dict[str, Any],
+        block_type: Any,
+    ) -> list[DiscoveredURL]:
+        """Try DynamicBypassEngine to fetch RSS/sitemap feeds when blocked.
+
+        Attempts up to DISCOVERY_BYPASS_MAX_ATTEMPTS strategies on each
+        discovery URL (RSS, sitemap). Returns discovered URLs from the
+        first successful bypass.
+
+        Args:
+            site_id: Site identifier.
+            site_cfg: Site configuration from sources.yaml.
+            block_type: Detected BlockType or None.
+
+        Returns:
+            List of discovered URLs, or empty list on failure.
+        """
+        assert self._bypass_engine is not None
+        assert self._url_discovery is not None
+
+        crawl_config = site_cfg.get("crawl", {})
+        base_url = site_cfg.get("url", "")
+        feed_urls = self._collect_discovery_urls(crawl_config, base_url)
+
+        if not feed_urls:
+            logger.debug("bypass_discovery_no_feeds site_id=%s", site_id)
+            return []
+
+        # Check bypass_state for previously learned successful strategy
+        site_state = self._bypass_state.get("sites", {}).get(site_id, {})
+        preferred_block_type = block_type
+        if preferred_block_type is None and site_state.get("last_block_type"):
+            from src.crawling.dynamic_bypass import BlockType
+            try:
+                preferred_block_type = BlockType(site_state["last_block_type"])
+            except (ValueError, KeyError):
+                pass
+
+        for feed_url in feed_urls:
+            bypass_result = self._bypass_engine.try_strategies(
+                url=feed_url,
+                block_type=preferred_block_type,
+                site_id=site_id,
+                max_attempts=DISCOVERY_BYPASS_MAX_ATTEMPTS,
+                timeout=30.0,
+            )
+
+            if not bypass_result.success or len(bypass_result.html) < 500:
+                logger.debug(
+                    "bypass_discovery_feed_failed site_id=%s url=%s strategy=%s",
+                    site_id, feed_url[:80], bypass_result.strategy_name,
+                )
+                continue
+
+            # Parse the response — deterministic content type detection
+            parsed = self._parse_discovery_response(
+                feed_url, bypass_result.html, site_id, site_cfg,
+            )
+            if parsed:
+                logger.info(
+                    "bypass_discovery_parsed site_id=%s url=%s strategy=%s "
+                    "tier=%s urls_found=%s",
+                    site_id, feed_url[:80], bypass_result.strategy_name,
+                    bypass_result.strategy_tier, len(parsed),
+                )
+                return parsed
+
+        return []
+
+    @staticmethod
+    def _collect_discovery_urls(
+        crawl_config: dict[str, Any],
+        base_url: str,
+    ) -> list[str]:
+        """Extract RSS and sitemap URLs from site config.
+
+        Returns an ordered list: RSS first (faster to parse), then sitemaps.
+        """
+        urls: list[str] = []
+
+        rss_url = crawl_config.get("rss_url", "")
+        if rss_url:
+            if not rss_url.startswith(("http://", "https://")):
+                from urllib.parse import urljoin
+                rss_url = urljoin(base_url, rss_url)
+            urls.append(rss_url)
+
+        # Sitemap URLs (singular and plural)
+        sitemap_urls_plural = crawl_config.get("sitemap_urls", [])
+        sitemap_url_singular = crawl_config.get("sitemap_url", "")
+        for s_url in sitemap_urls_plural:
+            if s_url:
+                if not s_url.startswith(("http://", "https://")):
+                    from urllib.parse import urljoin
+                    s_url = urljoin(base_url, s_url)
+                if s_url not in urls:
+                    urls.append(s_url)
+        if sitemap_url_singular:
+            if not sitemap_url_singular.startswith(("http://", "https://")):
+                from urllib.parse import urljoin
+                sitemap_url_singular = urljoin(base_url, sitemap_url_singular)
+            if sitemap_url_singular not in urls:
+                urls.append(sitemap_url_singular)
+
+        return urls
+
+    def _parse_discovery_response(
+        self,
+        feed_url: str,
+        html: str,
+        site_id: str,
+        site_cfg: dict[str, Any],
+    ) -> list[DiscoveredURL]:
+        """Parse bypass response as RSS, Atom, Sitemap, or HTML.
+
+        Deterministic content-type detection via XML tag inspection.
+        No LLM judgment — pure string pattern matching.
+        """
+        assert self._url_discovery is not None
+        stripped = html.strip()
+
+        # Detect XML format by root tag (deterministic)
+        if stripped.startswith("<?xml") or stripped.startswith("<"):
+            lower = stripped[:500].lower()
+
+            if "<rss" in lower or "<feed" in lower or "<channel>" in lower:
+                # RSS/Atom feed
+                return self._url_discovery.parse_feed_from_text(
+                    html, site_id,
+                )
+
+            if "<urlset" in lower or "<sitemapindex" in lower:
+                # Sitemap XML
+                base_url = site_cfg.get("url", "")
+                return self._url_discovery.parse_sitemap_from_text(
+                    html, site_id, base_url=base_url,
+                )
+
+        # HTML page — try DOM link extraction
+        if "<html" in stripped[:500].lower():
+            from src.crawling.url_discovery import (
+                normalize_url,
+                is_article_url,
+            )
+            import re as _re
+
+            base_url = site_cfg.get("url", "")
+            results: list[DiscoveredURL] = []
+            seen: set[str] = set()
+
+            for m in _re.finditer(r'href=["\']([^"\']+)["\']', html):
+                href = m.group(1)
+                if not href.startswith(("http://", "https://")):
+                    from urllib.parse import urljoin
+                    href = urljoin(base_url, href)
+                normalized = normalize_url(href)
+                if normalized and is_article_url(normalized) and normalized not in seen:
+                    seen.add(normalized)
+                    results.append(DiscoveredURL(
+                        url=normalized,
+                        source_id=site_id,
+                        discovered_via="bypass_dom",
+                    ))
+
+            return results
+
+        return []
+
+    # -----------------------------------------------------------------------
+    # Bypass State SOT — cross-crawl learning persistence
+    # -----------------------------------------------------------------------
+
+    @staticmethod
+    def _load_bypass_state() -> dict[str, Any]:
+        """Load bypass_state.json SOT. Returns empty structure if not found."""
+        if BYPASS_STATE_PATH.exists():
+            try:
+                with open(BYPASS_STATE_PATH, encoding="utf-8") as f:
+                    state = json.load(f)
+                logger.info(
+                    "bypass_state_loaded sites=%s",
+                    len(state.get("sites", {})),
+                )
+                return state
+            except (json.JSONDecodeError, OSError) as e:
+                logger.warning("bypass_state_load_error error=%s", str(e))
+        return {"version": 1, "updated_at": None, "sites": {}}
+
+    def _save_bypass_state(self) -> None:
+        """Persist bypass_state.json SOT to disk."""
+        self._bypass_state["updated_at"] = datetime.now(timezone.utc).isoformat()
+        BYPASS_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with open(BYPASS_STATE_PATH, "w", encoding="utf-8") as f:
+                json.dump(self._bypass_state, f, indent=2, ensure_ascii=False)
+        except OSError as e:
+            logger.warning("bypass_state_save_error error=%s", str(e))
+
+    def _update_bypass_state(
+        self,
+        site_id: str,
+        success: bool,
+        block_type: Any = None,
+    ) -> None:
+        """Update per-site bypass learning state and persist."""
+        sites = self._bypass_state.setdefault("sites", {})
+        entry = sites.setdefault(site_id, {})
+        entry["discovery_bypass_needed"] = True
+        if block_type is not None:
+            entry["last_block_type"] = block_type.value if hasattr(block_type, "value") else str(block_type)
+        if success:
+            entry["last_success_at"] = datetime.now(timezone.utc).isoformat()
+        entry["last_attempt_at"] = datetime.now(timezone.utc).isoformat()
+        self._save_bypass_state()
+
+    # -----------------------------------------------------------------------
+    # Failure Report — post-crawl diagnosis for exhausted sites
+    # -----------------------------------------------------------------------
+
+    def _generate_failure_report(
+        self,
+        failed_site_ids: list[str],
+        target_sites: dict[str, dict[str, Any]],
+        all_results: dict[str, CrawlResult],
+    ) -> None:
+        """Generate deterministic failure report + next-crawl recommendations.
+
+        Called when Never-Abandon multi-pass cap is reached. Writes to
+        data/raw/YYYY-MM-DD/crawl_exhausted_sites.json.
+
+        For each failed site, records:
+        - Last known block type (from bypass_state SOT)
+        - Strategies tried and their results
+        - Deterministic recommended_action for next crawl
+        """
+        from src.config.constants import MULTI_PASS_MAX_EXTRA
+
+        report: dict[str, Any] = {
+            "date": self._date,
+            "generated_at": datetime.now(timezone.utc).isoformat(),
+            "max_passes_exhausted": MULTI_PASS_MAX_EXTRA,
+            "exhausted_sites": [],  # list of per-site dicts (consumer contract)
+        }
+
+        for site_id in failed_site_ids:
+            result = all_results.get(site_id)
+            site_cfg = target_sites.get(site_id, {})
+
+            # Gather evidence from bypass_state SOT
+            site_bypass = self._bypass_state.get("sites", {}).get(site_id, {})
+
+            # Determine failure category (deterministic)
+            articles = result.extracted_count if result else 0
+            discovered = result.discovered_urls if result else 0
+            errors = result.errors[:5] if result else []  # First 5 errors
+            block_type = site_bypass.get("last_block_type", "unknown")
+
+            if discovered == 0:
+                failure_category = "discovery_blocked"
+                recommendation = (
+                    f"URL discovery completely blocked (block_type={block_type}). "
+                    "Next crawl: try T2 browser rendering for discovery, "
+                    "or add alternative RSS/sitemap URLs to sources.yaml. "
+                    "Consider T4 Wayback Machine as last resort."
+                )
+            elif articles == 0 and discovered > 0:
+                failure_category = "extraction_blocked"
+                recommendation = (
+                    f"URLs discovered ({discovered}) but extraction failed. "
+                    "Next crawl: DynamicBypassEngine should escalate to "
+                    "T2 (Patchright/Camoufox) for extraction. "
+                    "Check if site requires JS rendering."
+                )
+            else:
+                failure_category = "partial_timeout"
+                recommendation = (
+                    f"Collected {articles}/{discovered} articles before timeout. "
+                    "Next crawl: increase per-site timeout or reduce "
+                    "rate_limit_seconds in sources.yaml."
+                )
+
+            report["exhausted_sites"].append({
+                "site_id": site_id,
+                "failure_category": failure_category,
+                "block_type": block_type,
+                "articles_collected": articles,
+                "urls_discovered": discovered,
+                "errors_sample": errors,
+                "recommendation": recommendation,
+                "site_url": site_cfg.get("url", ""),
+                "site_difficulty": site_cfg.get("meta", {}).get("difficulty", "unknown"),
+            })
+
+            logger.error(
+                "crawl_exhausted_site site_id=%s category=%s block_type=%s "
+                "articles=%s discovered=%s recommendation=%s",
+                site_id, failure_category, block_type,
+                articles, discovered, recommendation[:100],
+            )
+
+        # Write report
+        output_path = self._output_dir / "crawl_exhausted_sites.json"
+        try:
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(report, f, indent=2, ensure_ascii=False)
+            logger.warning(
+                "crawl_exhausted_report_written path=%s sites=%s",
+                str(output_path), len(failed_site_ids),
+            )
+        except OSError as e:
+            logger.error("crawl_exhausted_report_error error=%s", str(e))
 
     def _filter_processed_urls(
         self,
@@ -1613,7 +2005,8 @@ class CrawlingPipeline:
                         self._retry_manager.mark_url_success(site_id, url_obj.url)
                         self._circuit_breakers.record_success(site_id)
                         logger.debug(
-                            "article_outside_24h url=%s published_at=%s cutoff=%s",
+                            "article_outside_24h site_id=%s url=%s published_at=%s cutoff=%s",
+                            site_id,
                             url_obj.url[:80],
                             pub_dt.isoformat(),
                             self._lookback_cutoff.isoformat(),
@@ -1633,7 +2026,8 @@ class CrawlingPipeline:
                 if dedup_result.is_duplicate:
                     result.skipped_dedup_count += 1
                     logger.debug(
-                        "article_deduped url=%s level=%s reason=%s",
+                        "article_deduped site_id=%s url=%s level=%s reason=%s",
+                        site_id,
                         url_obj.url[:80], dedup_result.level, dedup_result.reason[:80],
                     )
                 else:

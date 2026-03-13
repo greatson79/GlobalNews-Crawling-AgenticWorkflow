@@ -2,7 +2,7 @@ Execute the GlobalNews crawling and analysis pipeline to collect real news data 
 
 ## Instructions
 
-This command runs the **actual system** (not the workflow builder). It crawls 44 international news sites, processes articles through an 8-stage NLP pipeline, and produces Parquet/SQLite output.
+This command runs the **actual system** (not the workflow builder). It crawls 121 international news sites (Groups A-J), processes articles through an 8-stage NLP pipeline, and produces Parquet/SQLite output.
 
 ### Step 0: Ensure Domain Venv
 

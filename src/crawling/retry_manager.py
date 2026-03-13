@@ -77,7 +77,7 @@ TOTAL_MAX_ATTEMPTS = TOTAL_STANDARD_ATTEMPTS
 # It cycles through alternative source strategies (RSS, cache, AMP) with
 # exponential backoff (30s → 60s → 120s → ... → max 600s) until success
 # or daily time budget exhaustion.
-NEVER_ABANDON_MAX_CYCLES = 50  # Safety cap: 50 additional cycles beyond standard 90
+NEVER_ABANDON_MAX_CYCLES = 10  # Hard cap: 10 cycles, then report failure + recommend alternatives
 NEVER_ABANDON_BASE_DELAY = 30.0  # Starting delay for persistence loop
 NEVER_ABANDON_MAX_DELAY = 600.0  # Max 10-minute delay between cycles
 NEVER_ABANDON_BACKOFF_FACTOR = 1.5  # Exponential backoff multiplier
@@ -672,18 +672,19 @@ class RetryManager:
         """Advance to the next Never-Abandon cycle.
 
         Returns:
-            Always True — CRAWL_NEVER_ABANDON means no cycle cap.
-            Logs warning at former cap threshold for observability.
+            True if more cycles are allowed, False if cap reached.
+            At cap, the site is logged for post-crawl failure diagnosis.
         """
         state = self.get_state(site_id)
-        state.never_abandon_cycle += 1
-        if state.never_abandon_cycle == NEVER_ABANDON_MAX_CYCLES:
-            logger.warning(
-                "never_abandon_milestone site_id=%s cycles=%s "
-                "— continuing indefinitely (CRAWL_NEVER_ABANDON)",
-                site_id, state.never_abandon_cycle,
+        if state.never_abandon_cycle >= NEVER_ABANDON_MAX_CYCLES:
+            logger.error(
+                "never_abandon_cap_reached site_id=%s cycles=%s/%s "
+                "— stopping retries, will generate failure report",
+                site_id, state.never_abandon_cycle, NEVER_ABANDON_MAX_CYCLES,
             )
-        return True  # Never stop — crawl until complete
+            return False  # Stop — record for diagnosis
+        state.never_abandon_cycle += 1
+        return True
 
     def get_retry_stats(self) -> dict[str, Any]:
         """Get aggregate retry statistics across all sites.

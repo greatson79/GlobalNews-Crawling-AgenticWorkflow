@@ -298,6 +298,27 @@ class RSSParser:
 
         return None
 
+    def parse_feed_from_text(
+        self,
+        xml_text: str,
+        source_id: str,
+        max_age_days: int = 1,
+    ) -> list[DiscoveredURL]:
+        """Parse RSS/Atom feed from raw XML text (no network fetch).
+
+        Used by pipeline's bypass discovery fallback when DynamicBypassEngine
+        fetches the feed HTML/XML via alternative strategies.
+
+        Args:
+            xml_text: Raw XML string of the RSS/Atom feed.
+            source_id: Site identifier.
+            max_age_days: Freshness filter.
+
+        Returns:
+            List of DiscoveredURL objects.
+        """
+        return self._parse_xml_text(xml_text, source_id, "bypass_rss")
+
     def _parse_feed_raw(
         self,
         feed_url: str,
@@ -320,10 +341,30 @@ class RSSParser:
             logger.error("rss_raw_fetch_failed url=%s error=%s", feed_url, str(e))
             return []
 
+        return self._parse_xml_text(response.text, source_id, "rss")
+
+    def _parse_xml_text(
+        self,
+        xml_text: str,
+        source_id: str,
+        discovered_via: str,
+    ) -> list[DiscoveredURL]:
+        """Core XML parser for RSS 2.0 and Atom feeds.
+
+        Shared by parse_feed_from_text() and _parse_feed_raw().
+
+        Args:
+            xml_text: Raw XML string.
+            source_id: Site identifier.
+            discovered_via: Discovery method tag for DiscoveredURL.
+
+        Returns:
+            List of DiscoveredURL objects.
+        """
         try:
-            root = ET.fromstring(response.text)
+            root = ET.fromstring(xml_text)
         except ET.ParseError as e:
-            logger.warning("rss_raw_parse_error url=%s error=%s", feed_url, str(e))
+            logger.warning("rss_xml_parse_error source_id=%s error=%s", source_id, str(e))
             return []
 
         results: list[DiscoveredURL] = []
@@ -347,7 +388,7 @@ class RSSParser:
             results.append(DiscoveredURL(
                 url=url,
                 source_id=source_id,
-                discovered_via="rss",
+                discovered_via=discovered_via,
                 published_at=pub_date,
                 title_hint=title_hint,
             ))
@@ -378,12 +419,12 @@ class RSSParser:
                 results.append(DiscoveredURL(
                     url=url,
                     source_id=source_id,
-                    discovered_via="rss",
+                    discovered_via=discovered_via,
                     published_at=pub_date,
                     title_hint=title_hint,
                 ))
 
-        logger.info("rss_raw_parsed url=%s source_id=%s articles_found=%s", feed_url, source_id, len(results))
+        logger.info("rss_xml_parsed source_id=%s via=%s articles_found=%s", source_id, discovered_via, len(results))
         return results
 
 
@@ -464,6 +505,58 @@ class SitemapParser:
             )
         else:
             logger.warning("sitemap_unknown_format url=%s root_tag=%s", sitemap_url, root.tag)
+            return []
+
+    def parse_sitemap_from_text(
+        self,
+        xml_text: str,
+        source_id: str,
+        base_url: str = "",
+        max_age_days: int = 1,
+        max_urls: int = 5000,
+        url_pattern: str | None = None,
+    ) -> list[DiscoveredURL]:
+        """Parse a sitemap from raw XML text (no network fetch).
+
+        Used by pipeline's bypass discovery fallback when DynamicBypassEngine
+        fetches the sitemap via alternative strategies.
+
+        Args:
+            xml_text: Raw XML string of the sitemap.
+            source_id: Site identifier.
+            base_url: Base URL for resolving relative URLs.
+            max_age_days: Freshness filter.
+            max_urls: Maximum URLs to collect.
+            url_pattern: Optional regex filter.
+
+        Returns:
+            List of DiscoveredURL objects.
+        """
+        try:
+            root = ET.fromstring(xml_text)
+        except ET.ParseError as e:
+            logger.warning("sitemap_text_parse_error source_id=%s error=%s", source_id, str(e))
+            return []
+
+        tag = root.tag
+        if "}" in tag:
+            tag = tag.split("}")[-1]
+
+        if tag == "sitemapindex":
+            # Cannot recurse child sitemaps without NetworkGuard — parse only
+            # the index for child sitemap URLs (useful for logging/diagnosis).
+            logger.info(
+                "sitemap_from_text_index source_id=%s — index file, "
+                "cannot recurse child sitemaps without network access",
+                source_id,
+            )
+            return []
+        elif tag == "urlset":
+            return self._parse_urlset(
+                root, source_id, max_age_days, max_urls, url_pattern,
+            )
+        else:
+            logger.warning("sitemap_text_unknown_format source_id=%s root_tag=%s", source_id, root.tag)
             return []
 
     def _parse_sitemap_index(
@@ -852,6 +945,34 @@ class URLDiscovery:
 
         return all_urls
 
+    def parse_feed_from_text(
+        self, xml_text: str, source_id: str, max_age_days: int = 1,
+    ) -> list[DiscoveredURL]:
+        """Parse RSS/Atom feed from raw XML text (no network fetch).
+
+        Public proxy for RSSParser.parse_feed_from_text — avoids callers
+        needing to reach into private _rss_parser member.
+        """
+        return self._rss_parser.parse_feed_from_text(xml_text, source_id, max_age_days)
+
+    def parse_sitemap_from_text(
+        self,
+        xml_text: str,
+        source_id: str,
+        base_url: str = "",
+        max_age_days: int = 1,
+        max_urls: int = 5000,
+        url_pattern: str | None = None,
+    ) -> list[DiscoveredURL]:
+        """Parse sitemap XML from raw text (no network fetch).
+
+        Public proxy for SitemapParser.parse_sitemap_from_text — avoids
+        callers needing to reach into private _sitemap_parser member.
+        """
+        return self._sitemap_parser.parse_sitemap_from_text(
+            xml_text, source_id, base_url, max_age_days, max_urls, url_pattern,
+        )
+
     def _discover_by_method(
         self,
         method: str,
@@ -989,35 +1110,56 @@ _SITEMAP_URL_DATE_RE = re.compile(
     r"(?:^|[/\-_.])(\d{4})[\-/]?(\d{2})(?=[/\-_.]|\.xml|$)"
 )
 
+# L2 heuristic: Unix epoch timestamp in sitemap query params.
+# Matches: ?date_start=1143662400, ?date_end=1710000000
+# Uses the larger timestamp (date_end if present, else date_start).
+_SITEMAP_UNIX_TS_RE = re.compile(
+    r"[?&]date_(?:start|end)=(\d{9,10})(?:&date_(?:start|end)=(\d{9,10}))?"
+)
+
 
 def _infer_date_from_sitemap_url(url: str) -> datetime | None:
     """Extract a date from a sitemap URL path for freshness filtering.
 
-    Looks for YYYY-MM or YYYYMM patterns in the URL. Returns the last
-    day of that month (UTC) so that a sitemap is only skipped when its
-    entire month is older than the cutoff.
+    Looks for YYYY-MM, YYYYMM, or Unix timestamp query params in the URL.
+    For YYYY-MM patterns, returns the last day of that month (UTC) so that
+    a sitemap is only skipped when its entire month is older than the cutoff.
+    For Unix timestamps, returns the datetime of the larger timestamp
+    (date_end if present).
 
     Args:
         url: Child sitemap URL string.
 
     Returns:
-        datetime at end of the inferred month, or None if no pattern matched.
+        datetime in UTC, or None if no pattern matched.
     """
+    # Try YYYY-MM pattern first
     match = _SITEMAP_URL_DATE_RE.search(url)
-    if match is None:
-        return None
-    try:
-        year, month = int(match.group(1)), int(match.group(2))
-        if not (1990 <= year <= 2100 and 1 <= month <= 12):
-            return None
-        # Last day of the month: go to first of next month, subtract 1 day
-        if month == 12:
-            end_of_month = datetime(year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
-        else:
-            end_of_month = datetime(year, month + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
-        return end_of_month
-    except (ValueError, OverflowError):
-        return None
+    if match is not None:
+        try:
+            year, month = int(match.group(1)), int(match.group(2))
+            if 1990 <= year <= 2100 and 1 <= month <= 12:
+                if month == 12:
+                    end_of_month = datetime(year + 1, 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+                else:
+                    end_of_month = datetime(year, month + 1, 1, tzinfo=timezone.utc) - timedelta(days=1)
+                return end_of_month
+        except (ValueError, OverflowError):
+            pass
+
+    # Try Unix epoch timestamp in query params (e.g. rg.ru sitemap)
+    ts_match = _SITEMAP_UNIX_TS_RE.search(url)
+    if ts_match is not None:
+        try:
+            ts1 = int(ts_match.group(1))
+            ts2 = int(ts_match.group(2)) if ts_match.group(2) else ts1
+            ts = max(ts1, ts2)  # Use the later timestamp
+            if 946684800 <= ts <= 2147483647:  # 2000-01-01 to 2038-01-19
+                return datetime.fromtimestamp(ts, tz=timezone.utc)
+        except (ValueError, OverflowError, OSError):
+            pass
+
+    return None
 
 
 def _parse_datetime_string(date_str: str) -> datetime | None:
