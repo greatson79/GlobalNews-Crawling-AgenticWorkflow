@@ -233,6 +233,14 @@ def normalize_url(url: str, base_url: str = "") -> str:
     return normalized
 
 
+_SOCIAL_MEDIA_DOMAINS: frozenset[str] = frozenset({
+    # Pure social networks — never contain crawlable news articles
+    "bsky.app", "x.com", "twitter.com", "t.co",
+    "linkedin.com", "facebook.com", "instagram.com",
+    "tiktok.com",
+})
+
+
 def is_article_url(url: str, source_url: str = "") -> bool:
     """Heuristic check if a URL is likely an article page vs navigation/category.
 
@@ -252,6 +260,11 @@ def is_article_url(url: str, source_url: str = "") -> bool:
     parsed = urlparse(url)
     path = parsed.path.lower()
 
+    # Block social media domains — these are profiles/posts, never news articles
+    hostname = parsed.hostname or ""
+    if any(hostname == d or hostname.endswith("." + d) for d in _SOCIAL_MEDIA_DOMAINS):
+        return False
+
     # Skip non-HTML resources
     non_article_extensions = (
         ".jpg", ".jpeg", ".png", ".gif", ".svg", ".webp", ".ico",
@@ -266,7 +279,7 @@ def is_article_url(url: str, source_url: str = "") -> bool:
     # Skip common non-article paths
     non_article_paths = (
         "/tag/", "/tags/", "/category/", "/categories/",
-        "/author/", "/authors/", "/page/", "/search",
+        "/author/", "/authors/", "/search",
         "/login", "/signup", "/register", "/subscribe",
         "/about", "/contact", "/privacy", "/terms",
         "/sitemap", "/robots.txt", "/feed", "/rss",
@@ -275,11 +288,24 @@ def is_article_url(url: str, source_url: str = "") -> bool:
     if any(segment in path for segment in non_article_paths):
         return False
 
+    # WordPress pagination: /page/N/ or /page/N (single integer segment after /page/).
+    # Exclude these but NOT date-based /page/YYYYMM/ paths (e.g. globaltimes.cn).
+    import re as _re
+    if _re.search(r'/page/\d{1,4}(?:/|$)', path):
+        return False
+
     # Very short paths are usually not articles (homepage, section pages)
     # e.g., "/", "/news/", "/politics/"
+    # Exception: Ghost CMS / flat-slug CMSes use single-segment paths for articles
+    # (e.g. 404media.co/article-slug-here/). Allow if the slug is long enough (≥20 chars)
+    # to distinguish from section pages like "/technology/" or "/politics/".
     path_segments = [s for s in path.split("/") if s]
     if len(path_segments) < 2:
-        return False
+        if not path_segments:
+            return False
+        # Single segment: allow only if slug is long (Ghost-style flat article URL)
+        if len(path_segments[0]) < 20:
+            return False
 
     return True
 
@@ -306,6 +332,7 @@ class RSSParser:
         feed_url: str,
         source_id: str,
         max_age_days: int = 1,
+        tz_offset_hours: int = 0,
     ) -> list[DiscoveredURL]:
         """Fetch and parse an RSS/Atom feed.
 
@@ -314,6 +341,8 @@ class RSSParser:
             source_id: Site identifier for rate limiting.
             max_age_days: Only include articles published within this many days.
                 Defaults to 1 (24h lookback for daily execution).
+            tz_offset_hours: UTC offset for sites whose RSS pubDate has no timezone.
+                E.g. 9 for Korean sites (KST = UTC+9). Default 0 = assume UTC.
 
         Returns:
             List of DiscoveredURL objects extracted from the feed.
@@ -355,8 +384,8 @@ class RSSParser:
             if not normalized or not is_article_url(normalized):
                 continue
 
-            # Extract publication date
-            pub_date = self._parse_feed_date(entry)
+            # Extract publication date (pass tz_offset so naive dates use site timezone)
+            pub_date = self._parse_feed_date(entry, tz_offset_hours=tz_offset_hours)
 
             # Apply freshness filter
             if pub_date and pub_date < cutoff:
@@ -385,23 +414,50 @@ class RSSParser:
         )
         return results
 
-    def _parse_feed_date(self, entry: Any) -> datetime | None:
+    def _parse_feed_date(self, entry: Any, tz_offset_hours: int = 0) -> datetime | None:
         """Extract publication date from a feed entry.
 
         Args:
             entry: feedparser entry object.
+            tz_offset_hours: UTC offset of site's local time (e.g. 9 for KST).
+                Applied only when the parsed datetime is timezone-naive.
+                Default 0 = assume UTC (backward compatible).
 
         Returns:
             Parsed datetime in UTC, or None if not available.
         """
-        # feedparser provides parsed time tuples
-        for date_field in ("published_parsed", "updated_parsed", "created_parsed"):
+        tz_offset = timezone(timedelta(hours=tz_offset_hours)) if tz_offset_hours else timezone.utc
+
+        # feedparser provides parsed time tuples, but treats timezone-naive strings as UTC.
+        # When tz_offset_hours != 0, check if the original date string lacked a timezone;
+        # if so, feedparser's UTC result is wrong by tz_offset_hours — correct it.
+        #
+        # Use regex rather than simple substring check: "-" and "+" appear in date/time
+        # portions (e.g. "2026-04-25 13:21:42"), so substring matching produces false
+        # positives. We match only trailing timezone suffixes.
+        _HAS_TZ_RE = re.compile(
+            r"(?:[+-]\d{2}:?\d{2}|Z)$"  # ±HH:MM / ±HHMM / Z
+            r"|GMT|UTC",                  # named UTC synonyms anywhere
+            re.IGNORECASE,
+        )
+
+        for date_field, str_field in (
+            ("published_parsed", "published"),
+            ("updated_parsed", "updated"),
+            ("created_parsed", "created"),
+        ):
             parsed_time = getattr(entry, date_field, None)
             if parsed_time:
                 try:
                     import calendar
                     timestamp = calendar.timegm(parsed_time)
-                    return datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                    dt = datetime.fromtimestamp(timestamp, tz=timezone.utc)
+                    # Apply offset correction if the source string had no tz info
+                    if tz_offset_hours:
+                        raw_str = entry.get(str_field, "")
+                        if raw_str and not _HAS_TZ_RE.search(raw_str):
+                            dt = dt - timedelta(hours=tz_offset_hours)
+                    return dt
                 except (ValueError, OverflowError, TypeError):
                     continue
 
@@ -409,7 +465,7 @@ class RSSParser:
         for date_field in ("published", "updated", "created"):
             date_str = entry.get(date_field, "")
             if date_str:
-                parsed = _parse_datetime_string(date_str)
+                parsed = _parse_datetime_string(date_str, default_tz=tz_offset)
                 if parsed:
                     return parsed
 
@@ -1763,11 +1819,15 @@ class URLDiscovery:
                 return []
             if not rss_url.startswith(("http://", "https://")):
                 rss_url = urljoin(base_url, rss_url)
+            # Site timezone offset for naive pubDate correction (e.g. KST = +9)
+            tz_offset_hours = int(crawl_config.get("timezone_offset", 0))
             all_results: list[DiscoveredURL] = []
             seen_urls: set[str] = set()
             # Primary RSS feed
             try:
-                primary = self._rss_parser.parse_feed(rss_url, source_id, max_age_days)
+                primary = self._rss_parser.parse_feed(
+                    rss_url, source_id, max_age_days, tz_offset_hours=tz_offset_hours
+                )
                 for u in primary:
                     if u.url not in seen_urls:
                         seen_urls.add(u.url)
@@ -1779,7 +1839,9 @@ class URLDiscovery:
                 if not extra_url.startswith(("http://", "https://")):
                     extra_url = urljoin(base_url, extra_url)
                 try:
-                    extras = self._rss_parser.parse_feed(extra_url, source_id, max_age_days)
+                    extras = self._rss_parser.parse_feed(
+                        extra_url, source_id, max_age_days, tz_offset_hours=tz_offset_hours
+                    )
                     for u in extras:
                         if u.url not in seen_urls:
                             seen_urls.add(u.url)
@@ -1946,13 +2008,19 @@ def _infer_date_from_sitemap_url(url: str) -> datetime | None:
     return None
 
 
-def _parse_datetime_string(date_str: str) -> datetime | None:
+def _parse_datetime_string(
+    date_str: str,
+    default_tz: timezone = timezone.utc,
+) -> datetime | None:
     """Parse a datetime string from various common formats.
 
-    Normalizes to UTC. If no timezone info is present, assumes UTC.
+    Normalizes to UTC. If no timezone info is present, uses default_tz
+    (defaults to UTC for backward compatibility).
 
     Args:
         date_str: Date string to parse.
+        default_tz: Timezone to assume when the string has no tz info.
+            Pass timezone(timedelta(hours=9)) for KST sites, etc.
 
     Returns:
         datetime in UTC, or None if parsing fails.
@@ -1966,7 +2034,7 @@ def _parse_datetime_string(date_str: str) -> datetime | None:
     try:
         dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=default_tz)
         return dt.astimezone(timezone.utc)
     except (ValueError, TypeError):
         pass
@@ -1978,7 +2046,7 @@ def _parse_datetime_string(date_str: str) -> datetime | None:
             try:
                 dt = datetime.strptime(match.group(), fmt)
                 if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
+                    dt = dt.replace(tzinfo=default_tz)
                 return dt.astimezone(timezone.utc)
             except (ValueError, TypeError):
                 continue
@@ -1988,7 +2056,7 @@ def _parse_datetime_string(date_str: str) -> datetime | None:
         from email.utils import parsedate_to_datetime
         dt = parsedate_to_datetime(date_str)
         if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=timezone.utc)
+            dt = dt.replace(tzinfo=default_tz)
         return dt.astimezone(timezone.utc)
     except (ValueError, TypeError, IndexError):
         pass
